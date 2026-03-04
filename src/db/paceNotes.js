@@ -50,6 +50,24 @@ export async function upsertPaceNote(note) {
   );
 }
 
+/**
+ * Shifts all notes with seq >= fromSeq up by 1 to make room for an insert.
+ * Processes in descending order to avoid PK conflicts during the shift.
+ */
+export async function shiftSeqsUp(setId, fromSeq) {
+  const db = await getDb();
+  const rows = await db.getAllAsync(
+    `SELECT seq FROM pace_notes WHERE set_id = ? AND seq >= ? ORDER BY seq DESC`,
+    [setId, fromSeq]
+  );
+  for (const row of rows) {
+    await db.runAsync(
+      `UPDATE pace_notes SET seq = ? WHERE set_id = ? AND seq = ?`,
+      [row.seq + 1, setId, row.seq]
+    );
+  }
+}
+
 export async function deletePaceNote(setId, seq) {
   const db = await getDb();
   await db.runAsync(

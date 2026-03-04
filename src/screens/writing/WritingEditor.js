@@ -4,7 +4,7 @@ import {
   StyleSheet, FlatList, KeyboardAvoidingView, Platform, Alert, Modal,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { getPaceNotes, upsertPaceNote, deletePaceNote, getNextSeq, parseNote } from '../../db/paceNotes';
+import { getPaceNotes, upsertPaceNote, deletePaceNote, shiftSeqsUp, getNextSeq, parseNote } from '../../db/paceNotes';
 import { getRallyPrefsForSet } from '../../db/rallies';
 import { renderNote, formatOdo } from '../../utils/renderNote';
 
@@ -31,6 +31,7 @@ export default function WritingEditor({ route, navigation }) {
   const [notes, setNotes] = useState([]);
   const [current, setCurrent] = useState({ ...EMPTY_NOTE });
   const [editingSeq, setEditingSeq] = useState(null);
+  const [insertAt, setInsertAt] = useState(null); // null | number — seq to insert before
   const [displayOrder, setDisplayOrder] = useState('direction_first');
   const [odoUnit, setOdoUnit] = useState('metres');
   const [preNoteDecs, setPreNoteDecs] = useState(['!', '!!', '!!!', 'Care']);
@@ -98,7 +99,15 @@ export default function WritingEditor({ route, navigation }) {
   // ── Save / clear ───────────────────────────────────────────────────────────
   async function saveNote() {
     const odoMetres = odoInput ? parseInt(odoInput, 10) : null;
-    const seq = editingSeq ?? await getNextSeq(setId);
+    let seq;
+    if (editingSeq != null) {
+      seq = editingSeq;
+    } else if (insertAt != null) {
+      await shiftSeqsUp(setId, insertAt);
+      seq = insertAt;
+    } else {
+      seq = await getNextSeq(setId);
+    }
     await upsertPaceNote({
       set_id: setId, seq,
       ...current,
@@ -112,10 +121,11 @@ export default function WritingEditor({ route, navigation }) {
   function clearCurrent() {
     setCurrent({ ...EMPTY_NOTE });
     setEditingSeq(null);
+    setInsertAt(null);
     setOdoInput('');
   }
 
-  // ── Edit / delete ──────────────────────────────────────────────────────────
+  // ── Edit / delete / insert ─────────────────────────────────────────────────
   function startEdit(note) {
     setCurrent({
       direction: note.direction,
@@ -128,14 +138,22 @@ export default function WritingEditor({ route, navigation }) {
       index_sequence: note.index_sequence,
     });
     setOdoInput(note.index_odo != null ? String(note.index_odo) : '');
+    setInsertAt(null);
     setEditingSeq(note.seq);
   }
 
-  async function handleDelete(seq) {
-    Alert.alert('Delete Note', 'Remove this pacenote?', [
-      { text: 'Cancel', style: 'cancel' },
+  function noteActions(note) {
+    Alert.alert(`Note #${note.seq}`, renderNote(note, displayOrder, preNoteDecs) || '—', [
+      { text: 'Insert Before', onPress: () => { clearCurrent(); setInsertAt(note.seq); } },
+      { text: 'Insert After',  onPress: () => { clearCurrent(); setInsertAt(note.seq + 1); } },
       { text: 'Delete', style: 'destructive',
-        onPress: async () => { await deletePaceNote(setId, seq); loadNotes(); } },
+        onPress: () => Alert.alert('Delete Note', 'Remove this pacenote?', [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Delete', style: 'destructive',
+            onPress: async () => { await deletePaceNote(setId, note.seq); loadNotes(); } },
+        ]),
+      },
+      { text: 'Cancel', style: 'cancel' },
     ]);
   }
 
@@ -173,7 +191,7 @@ export default function WritingEditor({ route, navigation }) {
             <TouchableOpacity
               style={[styles.historyItem, editingSeq === item.seq && styles.historyItemActive]}
               onPress={() => startEdit(item)}
-              onLongPress={() => handleDelete(item.seq)}
+              onLongPress={() => noteActions(item)}
             >
               <Text style={styles.historyOdo}>
                 {formatOdo(item.index_odo, odoUnit) || `#${item.seq}`}
@@ -188,9 +206,11 @@ export default function WritingEditor({ route, navigation }) {
 
       {/* ── Preview / editing banner ─────────────────────────────────── */}
       <View style={styles.previewBox}>
-        {editingSeq != null && (
+        {(editingSeq != null || insertAt != null) && (
           <View style={styles.editingBanner}>
-            <Text style={styles.editingLabel}>Editing #{editingSeq}</Text>
+            <Text style={styles.editingLabel}>
+              {editingSeq != null ? `Editing #${editingSeq}` : `Inserting before #${insertAt}`}
+            </Text>
             <TouchableOpacity onPress={clearCurrent}>
               <Text style={styles.editingNewBtn}>+ New Note</Text>
             </TouchableOpacity>
@@ -282,7 +302,7 @@ export default function WritingEditor({ route, navigation }) {
           </TouchableOpacity>
           <TouchableOpacity style={styles.btnSave} onPress={saveNote}>
             <Text style={styles.btnSaveText}>
-              {editingSeq != null ? 'Update' : 'Add Note'}
+              {editingSeq != null ? 'Update' : insertAt != null ? 'Insert' : 'Add Note'}
             </Text>
           </TouchableOpacity>
         </View>
