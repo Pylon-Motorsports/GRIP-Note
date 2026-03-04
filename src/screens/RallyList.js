@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import {
   View, Text, TouchableOpacity, TextInput,
-  Modal, StyleSheet, Alert, SectionList, Platform,
+  Modal, StyleSheet, Alert, SectionList, Platform, ScrollView,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useFocusEffect } from '@react-navigation/native';
@@ -10,6 +10,15 @@ import {
   getStages, createStage, updateStage, deleteStage,
   duplicateRally, duplicateStage,
 } from '../db/rallies';
+import { getSetting } from '../db/database';
+
+// Same decorator list as WritingEditor — used for the pre-note selector
+const ALL_DECORATORS = [
+  '!', '!!', '!!!', 'Care', 'Brow', 'Opens', 'Maybe', 'Over Crest', 'Jump',
+  "Don't Cut", 'Keep In', 'Keep Out', 'Flat', 'Narrows', 'Widens', 'Slippery', 'Bumps',
+];
+
+const DEFAULT_PRE_NOTE = ['!', '!!', '!!!', 'Care'];
 
 function toDateStr(d) { return d.toISOString().split('T')[0]; }
 function parseDate(s) { return s ? new Date(s + 'T00:00:00') : new Date(); }
@@ -18,7 +27,7 @@ export default function RallyList() {
   const [sections, setSections] = useState([]);
   const [expanded, setExpanded] = useState({});
 
-  // Create/edit modal — shared for rally + stage
+  // Create/edit modal
   const [modal, setModal] = useState(null); // 'createRally'|'editRally'|'createStage'|'editStage'|null
   const [activeRallyId, setActiveRallyId] = useState(null);
   const [editTargetId, setEditTargetId] = useState(null);
@@ -26,6 +35,11 @@ export default function RallyList() {
   const [inputDriver, setInputDriver] = useState('');
   const [pickedDate, setPickedDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // Rally preferences (within modal)
+  const [prefDisplayOrder, setPrefDisplayOrder] = useState('direction_first');
+  const [prefOdoUnit, setPrefOdoUnit] = useState('metres');
+  const [prefPreNoteDecs, setPrefPreNoteDecs] = useState(DEFAULT_PRE_NOTE);
 
   useFocusEffect(useCallback(() => { load(); }, []));
 
@@ -43,10 +57,19 @@ export default function RallyList() {
 
   // ── Open modals ────────────────────────────────────────────────────────────
 
-  function openCreateRally() {
+  async function openCreateRally() {
+    // Pre-populate from global defaults
+    const [order, unit, decs] = await Promise.all([
+      getSetting('display_order'),
+      getSetting('odo_unit'),
+      getSetting('pre_note_decs'),
+    ]);
     setInputName('');
     setInputDriver('');
     setPickedDate(new Date());
+    setPrefDisplayOrder(order ?? 'direction_first');
+    setPrefOdoUnit(unit ?? 'metres');
+    setPrefPreNoteDecs(decs ? JSON.parse(decs) : DEFAULT_PRE_NOTE);
     setEditTargetId(null);
     setModal('createRally');
   }
@@ -55,6 +78,9 @@ export default function RallyList() {
     setInputName(rally.name);
     setInputDriver(rally.driver ?? '');
     setPickedDate(parseDate(rally.date));
+    setPrefDisplayOrder(rally.display_order ?? 'direction_first');
+    setPrefOdoUnit(rally.odo_unit ?? 'metres');
+    setPrefPreNoteDecs(rally.pre_note_decs ? JSON.parse(rally.pre_note_decs) : DEFAULT_PRE_NOTE);
     setEditTargetId(rally.id);
     setModal('editRally');
   }
@@ -82,16 +108,34 @@ export default function RallyList() {
     setShowDatePicker(false);
   }
 
+  // ── Toggle a decorator in the pre-note list ────────────────────────────────
+
+  function togglePreNoteDec(dec) {
+    setPrefPreNoteDecs(prev =>
+      prev.includes(dec) ? prev.filter(d => d !== dec) : [...prev, dec]
+    );
+  }
+
   // ── Actions ────────────────────────────────────────────────────────────────
 
   async function handleSave() {
     if (!inputName.trim()) return;
     switch (modal) {
       case 'createRally':
-        await createRally({ name: inputName.trim(), date: toDateStr(pickedDate), driver: inputDriver.trim() || null });
+        await createRally({
+          name: inputName.trim(), date: toDateStr(pickedDate),
+          driver: inputDriver.trim() || null,
+          displayOrder: prefDisplayOrder, odoUnit: prefOdoUnit,
+          preNoteDecs: prefPreNoteDecs,
+        });
         break;
       case 'editRally':
-        await updateRally(editTargetId, { name: inputName.trim(), date: toDateStr(pickedDate), driver: inputDriver.trim() || null });
+        await updateRally(editTargetId, {
+          name: inputName.trim(), date: toDateStr(pickedDate),
+          driver: inputDriver.trim() || null,
+          displayOrder: prefDisplayOrder, odoUnit: prefOdoUnit,
+          preNoteDecs: prefPreNoteDecs,
+        });
         break;
       case 'createStage':
         await createStage({ rallyId: activeRallyId, name: inputName.trim() });
@@ -151,7 +195,10 @@ export default function RallyList() {
   }
 
   const isRallyModal = modal === 'createRally' || modal === 'editRally';
-  const modalTitle = { createRally: 'New Rally', editRally: 'Edit Rally', createStage: 'New Stage', editStage: 'Rename Stage' }[modal] ?? '';
+  const modalTitle = {
+    createRally: 'New Rally', editRally: 'Edit Rally',
+    createStage: 'New Stage', editStage: 'Rename Stage',
+  }[modal] ?? '';
 
   return (
     <View style={styles.container}>
@@ -207,63 +254,133 @@ export default function RallyList() {
       <Modal visible={modal !== null} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>{modalTitle}</Text>
+            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+              <Text style={styles.modalTitle}>{modalTitle}</Text>
 
-            <TextInput
-              style={styles.input}
-              placeholder={isRallyModal ? 'Event name' : 'Stage name (e.g. SS1)'}
-              placeholderTextColor="#666"
-              value={inputName}
-              onChangeText={setInputName}
-              autoFocus
-            />
+              <TextInput
+                style={styles.input}
+                placeholder={isRallyModal ? 'Event name' : 'Stage name (e.g. SS1)'}
+                placeholderTextColor="#666"
+                value={inputName}
+                onChangeText={setInputName}
+                autoFocus
+              />
 
-            {isRallyModal && (
-              <>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Driver / Co-driver (optional)"
-                  placeholderTextColor="#666"
-                  value={inputDriver}
-                  onChangeText={setInputDriver}
-                />
-
-                <TouchableOpacity
-                  style={styles.dateTrigger}
-                  onPress={() => setShowDatePicker(true)}
-                >
-                  <Text style={styles.dateTriggerLabel}>Date</Text>
-                  <Text style={styles.dateTriggerValue}>{toDateStr(pickedDate)}</Text>
-                </TouchableOpacity>
-
-                {showDatePicker && (
-                  <DateTimePicker
-                    value={pickedDate}
-                    mode="date"
-                    display={Platform.OS === 'ios' ? 'spinner' : 'calendar'}
-                    onChange={(event, date) => {
-                      setShowDatePicker(Platform.OS === 'ios');
-                      if (date) setPickedDate(date);
-                    }}
+              {isRallyModal && (
+                <>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Driver / Co-driver (optional)"
+                    placeholderTextColor="#666"
+                    value={inputDriver}
+                    onChangeText={setInputDriver}
                   />
-                )}
-              </>
-            )}
 
-            <View style={styles.modalButtons}>
-              <TouchableOpacity onPress={closeModal}>
-                <Text style={styles.cancel}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleSave}>
-                <Text style={styles.confirm}>
-                  {modal?.startsWith('edit') ? 'Save' : 'Create'}
-                </Text>
-              </TouchableOpacity>
-            </View>
+                  <TouchableOpacity
+                    style={styles.dateTrigger}
+                    onPress={() => setShowDatePicker(true)}
+                  >
+                    <Text style={styles.dateTriggerLabel}>Date</Text>
+                    <Text style={styles.dateTriggerValue}>{toDateStr(pickedDate)}</Text>
+                  </TouchableOpacity>
+
+                  {showDatePicker && (
+                    <DateTimePicker
+                      value={pickedDate}
+                      mode="date"
+                      display={Platform.OS === 'ios' ? 'spinner' : 'calendar'}
+                      onChange={(event, date) => {
+                        setShowDatePicker(Platform.OS === 'ios');
+                        if (date) setPickedDate(date);
+                      }}
+                    />
+                  )}
+
+                  {/* ── Note display preferences ── */}
+                  <Text style={styles.prefSectionLabel}>Note Display</Text>
+
+                  <Text style={styles.prefLabel}>Direction / Severity order</Text>
+                  <View style={styles.toggleRow}>
+                    <ToggleBtn
+                      label="Direction first"
+                      example="L 3"
+                      active={prefDisplayOrder === 'direction_first'}
+                      onPress={() => setPrefDisplayOrder('direction_first')}
+                    />
+                    <ToggleBtn
+                      label="Severity first"
+                      example="3 L"
+                      active={prefDisplayOrder === 'severity_first'}
+                      onPress={() => setPrefDisplayOrder('severity_first')}
+                    />
+                  </View>
+
+                  <Text style={styles.prefLabel}>Odometer unit</Text>
+                  <View style={styles.toggleRow}>
+                    <ToggleBtn
+                      label="Metres"
+                      example="1250 m"
+                      active={prefOdoUnit === 'metres'}
+                      onPress={() => setPrefOdoUnit('metres')}
+                    />
+                    <ToggleBtn
+                      label="Kilometres"
+                      example="1.25 km"
+                      active={prefOdoUnit === 'km'}
+                      onPress={() => setPrefOdoUnit('km')}
+                    />
+                  </View>
+
+                  <Text style={styles.prefLabel}>Decorators shown BEFORE the note</Text>
+                  <Text style={styles.prefHint}>
+                    All others appear after direction/severity.
+                  </Text>
+                  <View style={styles.chipWrap}>
+                    {ALL_DECORATORS.map(dec => {
+                      const active = prefPreNoteDecs.includes(dec);
+                      return (
+                        <TouchableOpacity
+                          key={dec}
+                          style={[styles.decChip, active && styles.decChipActive]}
+                          onPress={() => togglePreNoteDec(dec)}
+                        >
+                          <Text style={[styles.decChipText, active && styles.decChipTextActive]}>
+                            {dec}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </>
+              )}
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity onPress={closeModal}>
+                  <Text style={styles.cancel}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleSave}>
+                  <Text style={styles.confirm}>
+                    {modal?.startsWith('edit') ? 'Save' : 'Create'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
     </View>
+  );
+}
+
+function ToggleBtn({ label, example, active, onPress }) {
+  return (
+    <TouchableOpacity
+      style={[styles.toggleBtn, active && styles.toggleBtnActive]}
+      onPress={onPress}
+    >
+      <Text style={[styles.toggleBtnLabel, active && styles.toggleBtnLabelActive]}>{label}</Text>
+      <Text style={styles.toggleBtnExample}>{example}</Text>
+    </TouchableOpacity>
   );
 }
 
@@ -281,9 +398,7 @@ const styles = StyleSheet.create({
   rallyDate: { color: '#777', fontSize: 12, marginTop: 2 },
   rallyActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
 
-  iconBtn: {
-    paddingHorizontal: 8, paddingVertical: 4,
-  },
+  iconBtn: { paddingHorizontal: 8, paddingVertical: 4 },
   iconBtnText: { color: '#555', fontSize: 16 },
 
   addStageBtn: {
@@ -313,7 +428,10 @@ const styles = StyleSheet.create({
     flex: 1, backgroundColor: 'rgba(0,0,0,0.75)',
     justifyContent: 'center', padding: 24,
   },
-  modalCard: { backgroundColor: '#1a1a1a', borderRadius: 12, padding: 20 },
+  modalCard: {
+    backgroundColor: '#1a1a1a', borderRadius: 12, padding: 20,
+    maxHeight: '90%',
+  },
   modalTitle: { color: '#fff', fontSize: 18, fontWeight: '700', marginBottom: 16 },
   input: {
     borderWidth: 1, borderColor: '#333', borderRadius: 6,
@@ -326,6 +444,35 @@ const styles = StyleSheet.create({
   },
   dateTriggerLabel: { color: '#666', fontSize: 14 },
   dateTriggerValue: { color: '#fff', fontSize: 14, fontWeight: '600' },
+
+  prefSectionLabel: {
+    color: '#e63946', fontSize: 11, fontWeight: '700',
+    letterSpacing: 1, textTransform: 'uppercase',
+    marginTop: 16, marginBottom: 10,
+    borderTopWidth: 1, borderTopColor: '#2a2a2a', paddingTop: 14,
+  },
+  prefLabel: { color: '#888', fontSize: 12, marginBottom: 6 },
+  prefHint:  { color: '#444', fontSize: 11, marginBottom: 8 },
+
+  toggleRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
+  toggleBtn: {
+    flex: 1, borderWidth: 1, borderColor: '#333', borderRadius: 6,
+    padding: 10, backgroundColor: '#111',
+  },
+  toggleBtnActive: { borderColor: '#e63946', backgroundColor: 'rgba(230,57,70,0.1)' },
+  toggleBtnLabel: { color: '#666', fontSize: 13 },
+  toggleBtnLabelActive: { color: '#fff', fontWeight: '700' },
+  toggleBtnExample: { color: '#444', fontSize: 11, fontFamily: 'monospace', marginTop: 2 },
+
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 },
+  decChip: {
+    borderWidth: 1, borderColor: '#333', borderRadius: 6,
+    paddingVertical: 5, paddingHorizontal: 9, backgroundColor: '#111',
+  },
+  decChipActive: { borderColor: '#2196f3', backgroundColor: 'rgba(33,150,243,0.15)' },
+  decChipText: { color: '#666', fontSize: 12 },
+  decChipTextActive: { color: '#fff', fontWeight: '700' },
+
   modalButtons: {
     flexDirection: 'row', justifyContent: 'flex-end', gap: 20, marginTop: 8,
   },
