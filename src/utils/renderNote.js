@@ -1,28 +1,31 @@
-// Decorators that render BEFORE direction/severity
-const CAUTION_DECORATORS = new Set(['!', '!!', '!!!', 'care']);
-
 /**
  * Renders a pace note to a display string.
- * Order: [caution decorators] [direction/severity] [duration] [regular decorators] [joiner]
- * Caution decorators (!, !!, !!!, care) always lead the note.
+ * Order: [pre-note decorators] [direction/severity] [duration] [other decorators] [joiner]
  *
- * @param {object} note           - pace_note row (decorators as array)
- * @param {string} displayOrder   - "direction_first" | "severity_first"
+ * @param {object}   note           - pace_note row (decorators as array)
+ * @param {string}   displayOrder   - "direction_first" | "severity_first"
+ * @param {string[]} preNoteDecs    - decorator values that render BEFORE direction/severity
+ *                                   (case-insensitive match). Defaults to ['!','!!','!!!','Care'].
  * @returns {string}
  */
-export function renderNote(note, displayOrder = 'direction_first') {
+export function renderNote(
+  note,
+  displayOrder = 'direction_first',
+  preNoteDecs = ['!', '!!', '!!!', 'Care'],
+) {
+  const preSet = new Set(preNoteDecs.map(d => d.toLowerCase()));
   const decorators = Array.isArray(note.decorators) ? note.decorators : [];
-  const cautionDecs = decorators.filter(d => CAUTION_DECORATORS.has(d.toLowerCase()));
-  const regularDecs = decorators.filter(d => !CAUTION_DECORATORS.has(d.toLowerCase()));
+  const before = decorators.filter(d => preSet.has(d.toLowerCase()));
+  const after  = decorators.filter(d => !preSet.has(d.toLowerCase()));
 
   const parts = [];
 
-  // 1. Caution decorators first
-  parts.push(...cautionDecs);
+  // 1. Pre-note decorators
+  parts.push(...before);
 
   // 2. Direction / severity
   const dir = note.direction ?? '';
-  const sev = note.severity ?? '';
+  const sev = note.severity  ?? '';
   if (displayOrder === 'direction_first') {
     if (dir) parts.push(dir);
     if (sev) parts.push(sev);
@@ -34,8 +37,8 @@ export function renderNote(note, displayOrder = 'direction_first') {
   // 3. Duration
   if (note.duration) parts.push(note.duration);
 
-  // 4. Regular decorators
-  parts.push(...regularDecs);
+  // 4. Remaining decorators
+  parts.push(...after);
 
   // 5. Joiner
   if (note.joiner) parts.push(note.joiner);
