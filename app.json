@@ -1,15 +1,15 @@
 {
   "expo": {
-    "name": "GRIP",
-    "slug": "GRIP",
+    "name": "GRIP Note",
+    "slug": "grip-note",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "image": "./assets/bg-autumn.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#000000"
     },
     "ios": {
       "supportsTablet": true
@@ -24,6 +24,11 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-sqlite",
+      "@react-native-community/datetimepicker",
+      "expo-sharing"
+    ]
   }
 }
