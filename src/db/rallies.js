@@ -7,22 +7,55 @@ export async function getRallies() {
   return db.getAllAsync(`SELECT * FROM rallies ORDER BY date DESC, name ASC`);
 }
 
-export async function createRally({ name, date, driver }) {
+export async function createRally({ name, date, driver, displayOrder, odoUnit, preNoteDecs }) {
   const db = await getDb();
   const id = uuidv4();
   await db.runAsync(
-    `INSERT INTO rallies (id, name, date, driver) VALUES (?, ?, ?, ?)`,
-    [id, name, date, driver ?? null]
+    `INSERT INTO rallies (id, name, date, driver, display_order, odo_unit, pre_note_decs)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [id, name, date,
+     driver ?? null,
+     displayOrder ?? 'direction_first',
+     odoUnit ?? 'metres',
+     JSON.stringify(preNoteDecs ?? ['!', '!!', '!!!', 'Care'])]
   );
   return id;
 }
 
-export async function updateRally(id, { name, date, driver }) {
+export async function updateRally(id, { name, date, driver, displayOrder, odoUnit, preNoteDecs }) {
   const db = await getDb();
   await db.runAsync(
-    `UPDATE rallies SET name = ?, date = ?, driver = ?, updated_at = datetime('now') WHERE id = ?`,
-    [name, date, driver ?? null, id]
+    `UPDATE rallies
+     SET name = ?, date = ?, driver = ?,
+         display_order = ?, odo_unit = ?, pre_note_decs = ?,
+         updated_at = datetime('now')
+     WHERE id = ?`,
+    [name, date, driver ?? null,
+     displayOrder ?? 'direction_first',
+     odoUnit ?? 'metres',
+     JSON.stringify(preNoteDecs ?? ['!', '!!', '!!!', 'Care']),
+     id]
   );
+}
+
+/**
+ * Resolves display preferences for a given set_id by walking up to its rally.
+ * Falls back to safe defaults if the rally has no preferences stored yet.
+ */
+export async function getRallyPrefsForSet(setId) {
+  const db = await getDb();
+  const row = await db.getFirstAsync(`
+    SELECT r.display_order, r.odo_unit, r.pre_note_decs
+    FROM note_sets ns
+    JOIN stages s ON s.id = ns.stage_id
+    JOIN rallies r ON r.id = s.rally_id
+    WHERE ns.set_id = ?
+  `, [setId]);
+  return {
+    displayOrder: row?.display_order ?? 'direction_first',
+    odoUnit:      row?.odo_unit      ?? 'metres',
+    preNoteDecs:  row?.pre_note_decs ? JSON.parse(row.pre_note_decs) : ['!', '!!', '!!!', 'Care'],
+  };
 }
 
 export async function deleteRally(id) {
@@ -148,8 +181,10 @@ export async function duplicateRally(rallyId) {
 
   const newRallyId = uuidv4();
   await db.runAsync(
-    `INSERT INTO rallies (id, name, date, driver) VALUES (?, ?, ?, ?)`,
-    [newRallyId, `${source.name} (copy)`, source.date, source.driver]
+    `INSERT INTO rallies (id, name, date, driver, display_order, odo_unit, pre_note_decs)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [newRallyId, `${source.name} (copy)`, source.date, source.driver,
+     source.display_order, source.odo_unit, source.pre_note_decs]
   );
 
   const stages = await db.getAllAsync(`SELECT * FROM stages WHERE rally_id = ?`, [rallyId]);

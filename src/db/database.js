@@ -78,6 +78,9 @@ async function initialise(db) {
   // Migrations — safe to run on every startup (ALTER TABLE ignores existing columns)
   await db.execAsync(`ALTER TABLE note_sets ADD COLUMN driver TEXT`).catch(() => {});
   await db.execAsync(`ALTER TABLE rallies ADD COLUMN driver TEXT`).catch(() => {});
+  await db.execAsync(`ALTER TABLE rallies ADD COLUMN display_order TEXT DEFAULT 'direction_first'`).catch(() => {});
+  await db.execAsync(`ALTER TABLE rallies ADD COLUMN odo_unit TEXT DEFAULT 'metres'`).catch(() => {});
+  await db.execAsync(`ALTER TABLE rallies ADD COLUMN pre_note_decs TEXT DEFAULT '["!","!!","!!!","Care"]'`).catch(() => {});
 
   // Seed default settings (no-op if already present)
   await db.runAsync(
@@ -91,6 +94,10 @@ async function initialise(db) {
   await db.runAsync(
     `INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)`,
     ['active_rally_id', null]
+  );
+  await db.runAsync(
+    `INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)`,
+    ['pre_note_decs', '["!","!!","!!!","Care"]']
   );
 }
 
