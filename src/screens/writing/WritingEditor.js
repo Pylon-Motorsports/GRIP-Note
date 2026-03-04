@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { getPaceNotes, upsertPaceNote, deletePaceNote, getNextSeq, parseNote } from '../../db/paceNotes';
-import { getSetting } from '../../db/database';
+import { getRallyPrefsForSet } from '../../db/rallies';
 import { renderNote, formatOdo } from '../../utils/renderNote';
 
 // ── Base chip sets ──────────────────────────────────────────────────────────
@@ -33,6 +33,7 @@ export default function WritingEditor({ route, navigation }) {
   const [editingSeq, setEditingSeq] = useState(null);
   const [displayOrder, setDisplayOrder] = useState('direction_first');
   const [odoUnit, setOdoUnit] = useState('metres');
+  const [preNoteDecs, setPreNoteDecs] = useState(['!', '!!', '!!!', 'Care']);
   const [odoInput, setOdoInput] = useState('');
   const listRef = useRef(null);
 
@@ -53,10 +54,10 @@ export default function WritingEditor({ route, navigation }) {
   );
 
   async function loadSettings() {
-    const order = await getSetting('display_order');
-    const unit  = await getSetting('odo_unit');
-    if (order) setDisplayOrder(order);
-    if (unit)  setOdoUnit(unit);
+    const prefs = await getRallyPrefsForSet(setId);
+    setDisplayOrder(prefs.displayOrder);
+    setOdoUnit(prefs.odoUnit);
+    setPreNoteDecs(prefs.preNoteDecs);
   }
 
   async function loadNotes() {
@@ -138,7 +139,7 @@ export default function WritingEditor({ route, navigation }) {
     ]);
   }
 
-  const preview = renderNote(current, displayOrder) || '—';
+  const preview = renderNote(current, displayOrder, preNoteDecs) || '—';
 
   return (
     <KeyboardAvoidingView
@@ -178,7 +179,7 @@ export default function WritingEditor({ route, navigation }) {
                 {formatOdo(item.index_odo, odoUnit) || `#${item.seq}`}
               </Text>
               <Text style={styles.historyNote} numberOfLines={1}>
-                {renderNote(item, displayOrder)}
+                {renderNote(item, displayOrder, preNoteDecs)}
               </Text>
             </TouchableOpacity>
           )}

@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Speech from 'expo-speech';
 import { useFocusEffect } from '@react-navigation/native';
 import { getPaceNotes, parseNote } from '../../db/paceNotes';
-import { getSetting } from '../../db/database';
+import { getRallyPrefsForSet } from '../../db/rallies';
 import { renderNote, formatOdo } from '../../utils/renderNote';
 
 const BG = require('../../../assets/bg-winter.png');
@@ -18,6 +18,7 @@ export default function StageReader({ route, navigation }) {
   const [index, setIndex] = useState(0);
   const [displayOrder, setDisplayOrder] = useState('direction_first');
   const [odoUnit, setOdoUnit] = useState('metres');
+  const [preNoteDecs, setPreNoteDecs] = useState(['!', '!!', '!!!', 'Care']);
   const [ttsEnabled, setTtsEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const ttsRef = useRef(false);
@@ -34,13 +35,13 @@ export default function StageReader({ route, navigation }) {
 
   async function load() {
     setLoading(true);
-    const [order, unit, rows] = await Promise.all([
-      getSetting('display_order'),
-      getSetting('odo_unit'),
+    const [prefs, rows] = await Promise.all([
+      getRallyPrefsForSet(setId),
       getPaceNotes(setId),
     ]);
-    if (order) setDisplayOrder(order);
-    if (unit)  setOdoUnit(unit);
+    setDisplayOrder(prefs.displayOrder);
+    setOdoUnit(prefs.odoUnit);
+    setPreNoteDecs(prefs.preNoteDecs);
     setNotes(rows.map(parseNote));
     setIndex(0);
     setLoading(false);
@@ -50,7 +51,7 @@ export default function StageReader({ route, navigation }) {
   function speak(note) {
     if (!ttsRef.current) return;
     Speech.stop();
-    const text = renderNote(note, displayOrder);
+    const text = renderNote(note, displayOrder, preNoteDecs);
     if (text) Speech.speak(text, { language: 'en', rate: 0.85, pitch: 1.0 });
   }
 
@@ -102,7 +103,7 @@ export default function StageReader({ route, navigation }) {
   }
 
   const note = notes[index];
-  const noteText = renderNote(note, displayOrder);
+  const noteText = renderNote(note, displayOrder, preNoteDecs);
   const odo = formatOdo(note.index_odo, odoUnit);
   const landmark = note.index_landmark;
   const isFirst = index === 0;
