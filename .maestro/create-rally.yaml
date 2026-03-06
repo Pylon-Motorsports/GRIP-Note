@@ -1,0 +1,7 @@
+appId: com.fredgeorge.grip
+---
+- launchApp
+- tapOn: "+"                          # FAB to create rally
+- inputText: "Test Rally"             # Rally name
+- tapOn: "Create"
+- assertVisible: "Test Rally"         # Rally appears in list

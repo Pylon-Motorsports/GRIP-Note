@@ -1,0 +1,7 @@
+appId: com.fredgeorge.grip
+---
+- launchApp
+- tapOn: "Test Rally"
+- tapOn: "Export"
+- tapOn: "JSON"                       # Export as .grip.json
+# Share sheet appears (can't assert further in Maestro, but no crash = pass)

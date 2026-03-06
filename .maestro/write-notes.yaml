@@ -1,0 +1,11 @@
+appId: com.fredgeorge.grip
+---
+- launchApp
+- tapOn: "Test Rally"                 # Select rally
+- tapOn: "Recce"                      # Enter recce mode
+- tapOn: "SS1"                        # Select stage (assumes it exists)
+- tapOn: "Create New"                 # New note set
+- tapOn: "L"                          # Select direction
+- tapOn: "3"                          # Select severity
+- tapOn: "Save"                       # Save note
+- assertVisible: "L 3"               # Note appears in list

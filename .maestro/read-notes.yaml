@@ -1,0 +1,7 @@
+appId: com.fredgeorge.grip
+---
+- launchApp
+- tapOn: "Test Rally"
+- tapOn: "Rally"                      # Enter reading mode
+- tapOn: "SS1"
+- assertVisible: "L 3"               # Note visible in reader

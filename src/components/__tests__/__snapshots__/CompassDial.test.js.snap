@@ -1,0 +1,673 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`CompassDial matches snapshot with default props 1`] = `
+<View
+  style={
+    {
+      "alignItems": "center",
+      "backgroundColor": "#0a0a0a",
+      "paddingVertical": 8,
+    }
+  }
+>
+  <View
+    style={
+      {
+        "height": 240,
+        "position": "relative",
+        "width": 240,
+      }
+    }
+  >
+    <View
+      style={
+        {
+          "height": 240,
+          "position": "absolute",
+          "width": 240,
+        }
+      }
+    >
+      <View
+        style={
+          {
+            "backgroundColor": "rgba(10,10,10,0.6)",
+            "borderColor": "#2a2a2a",
+            "borderRadius": 116,
+            "borderWidth": 1.5,
+            "height": 232,
+            "left": 4,
+            "position": "absolute",
+            "top": 4,
+            "width": 232,
+          }
+        }
+      />
+    </View>
+    <View
+      pointerEvents="none"
+      style={
+        {
+          "alignItems": "center",
+          "bottom": 0,
+          "justifyContent": "center",
+          "left": 0,
+          "position": "absolute",
+          "right": 0,
+          "top": 0,
+        }
+      }
+    >
+      <Text
+        style={
+          {
+            "color": "#e63946",
+            "fontSize": 20,
+            "fontWeight": "700",
+            "letterSpacing": 1,
+          }
+        }
+      >
+        Straight
+      </Text>
+    </View>
+    <View
+      pointerEvents="none"
+      style={
+        [
+          {
+            "height": 240,
+            "left": 0,
+            "position": "absolute",
+            "top": 0,
+            "width": 240,
+          },
+          {
+            "transform": [
+              {
+                "rotate": "0deg",
+              },
+            ],
+          },
+        ]
+      }
+    >
+      <View
+        style={
+          {
+            "borderLeftColor": "transparent",
+            "borderLeftWidth": 8,
+            "borderRightColor": "transparent",
+            "borderRightWidth": 8,
+            "borderTopColor": "#e63946",
+            "borderTopWidth": 16,
+            "height": 0,
+            "left": 112,
+            "position": "absolute",
+            "top": 0,
+            "width": 0,
+          }
+        }
+      />
+    </View>
+  </View>
+</View>
+`;
+
+exports[`CompassDial matches snapshot with full props 1`] = `
+<View
+  style={
+    {
+      "alignItems": "center",
+      "backgroundColor": "#0a0a0a",
+      "paddingVertical": 8,
+    }
+  }
+>
+  <View
+    style={
+      {
+        "height": 240,
+        "position": "relative",
+        "width": 240,
+      }
+    }
+  >
+    <View
+      style={
+        {
+          "height": 240,
+          "position": "absolute",
+          "width": 240,
+        }
+      }
+    >
+      <View
+        style={
+          {
+            "backgroundColor": "rgba(10,10,10,0.6)",
+            "borderColor": "#2a2a2a",
+            "borderRadius": 116,
+            "borderWidth": 1.5,
+            "height": 232,
+            "left": 4,
+            "position": "absolute",
+            "top": 4,
+            "width": 232,
+          }
+        }
+      />
+      <View
+        style={
+          [
+            {
+              "backgroundColor": "#333",
+              "borderRadius": 1,
+              "position": "absolute",
+              "width": 2,
+            },
+            {
+              "height": 12,
+              "left": 225.35923732531847,
+              "top": 95.24599681197151,
+              "transform": [
+                {
+                  "rotate": "80deg",
+                },
+              ],
+              "transformOrigin": "center center",
+            },
+          ]
+        }
+      />
+      <View
+        style={
+          [
+            {
+              "backgroundColor": "#333",
+              "borderRadius": 1,
+              "position": "absolute",
+              "width": 2,
+            },
+            {
+              "height": 12,
+              "left": 12.64076267468154,
+              "top": 95.24599681197151,
+              "transform": [
+                {
+                  "rotate": "-80deg",
+                },
+              ],
+              "transformOrigin": "center center",
+            },
+          ]
+        }
+      />
+      <View
+        style={
+          [
+            {
+              "backgroundColor": "#333",
+              "borderRadius": 1,
+              "position": "absolute",
+              "width": 2,
+            },
+            {
+              "height": 12,
+              "left": 212.53074360871938,
+              "top": 59.999999999999986,
+              "transform": [
+                {
+                  "rotate": "60deg",
+                },
+              ],
+              "transformOrigin": "center center",
+            },
+          ]
+        }
+      />
+      <View
+        style={
+          [
+            {
+              "backgroundColor": "#333",
+              "borderRadius": 1,
+              "position": "absolute",
+              "width": 2,
+            },
+            {
+              "height": 12,
+              "left": 25.469256391280638,
+              "top": 59.999999999999986,
+              "transform": [
+                {
+                  "rotate": "-60deg",
+                },
+              ],
+              "transformOrigin": "center center",
+            },
+          ]
+        }
+      />
+      <View
+        style={
+          [
+            {
+              "backgroundColor": "#333",
+              "borderRadius": 1,
+              "position": "absolute",
+              "width": 2,
+            },
+            {
+              "height": 12,
+              "left": 188.42106184614624,
+              "top": 31.267200143150376,
+              "transform": [
+                {
+                  "rotate": "40deg",
+                },
+              ],
+              "transformOrigin": "center center",
+            },
+          ]
+        }
+      />
+      <View
+        style={
+          [
+            {
+              "backgroundColor": "#333",
+              "borderRadius": 1,
+              "position": "absolute",
+              "width": 2,
+            },
+            {
+              "height": 12,
+              "left": 49.578938153853755,
+              "top": 31.267200143150376,
+              "transform": [
+                {
+                  "rotate": "-40deg",
+                },
+              ],
+              "transformOrigin": "center center",
+            },
+          ]
+        }
+      />
+      <View
+        style={
+          [
+            {
+              "backgroundColor": "#333",
+              "borderRadius": 1,
+              "position": "absolute",
+              "width": 2,
+            },
+            {
+              "height": 12,
+              "left": 155.93817547917223,
+              "top": 12.513196955121884,
+              "transform": [
+                {
+                  "rotate": "20deg",
+                },
+              ],
+              "transformOrigin": "center center",
+            },
+          ]
+        }
+      />
+      <View
+        style={
+          [
+            {
+              "backgroundColor": "#333",
+              "borderRadius": 1,
+              "position": "absolute",
+              "width": 2,
+            },
+            {
+              "height": 12,
+              "left": 82.06182452082777,
+              "top": 12.513196955121884,
+              "transform": [
+                {
+                  "rotate": "-20deg",
+                },
+              ],
+              "transformOrigin": "center center",
+            },
+          ]
+        }
+      />
+      <View
+        style={
+          [
+            {
+              "backgroundColor": "#333",
+              "borderRadius": 1,
+              "position": "absolute",
+              "width": 2,
+            },
+            {
+              "height": 12,
+              "left": 128.4128202167471,
+              "top": 6.410972606091477,
+              "transform": [
+                {
+                  "rotate": "5deg",
+                },
+              ],
+              "transformOrigin": "center center",
+            },
+          ]
+        }
+      />
+      <View
+        style={
+          [
+            {
+              "backgroundColor": "#333",
+              "borderRadius": 1,
+              "position": "absolute",
+              "width": 2,
+            },
+            {
+              "height": 12,
+              "left": 109.58717978325292,
+              "top": 6.410972606091477,
+              "transform": [
+                {
+                  "rotate": "-5deg",
+                },
+              ],
+              "transformOrigin": "center center",
+            },
+          ]
+        }
+      />
+      <Text
+        style={
+          [
+            {
+              "color": "#444",
+              "fontSize": 12,
+              "fontWeight": "600",
+              "position": "absolute",
+              "textAlign": "center",
+              "width": 28,
+            },
+            {
+              "left": 202.5111597951964,
+              "top": 93.98247858864082,
+            },
+            false,
+          ]
+        }
+      >
+        1
+      </Text>
+      <Text
+        style={
+          [
+            {
+              "color": "#444",
+              "fontSize": 12,
+              "fontWeight": "600",
+              "position": "absolute",
+              "textAlign": "center",
+              "width": 28,
+            },
+            {
+              "left": 9.488840204803608,
+              "top": 93.98247858864082,
+            },
+            false,
+          ]
+        }
+      >
+        1
+      </Text>
+      <Text
+        style={
+          [
+            {
+              "color": "#444",
+              "fontSize": 12,
+              "fontWeight": "600",
+              "position": "absolute",
+              "textAlign": "center",
+              "width": 28,
+            },
+            {
+              "left": 190.87048957087498,
+              "top": 61.999999999999986,
+            },
+            false,
+          ]
+        }
+      >
+        3
+      </Text>
+      <Text
+        style={
+          [
+            {
+              "color": "#444",
+              "fontSize": 12,
+              "fontWeight": "600",
+              "position": "absolute",
+              "textAlign": "center",
+              "width": 28,
+            },
+            {
+              "left": 21.12951042912502,
+              "top": 61.999999999999986,
+            },
+            false,
+          ]
+        }
+      >
+        3
+      </Text>
+      <Text
+        style={
+          [
+            {
+              "color": "#444",
+              "fontSize": 12,
+              "fontWeight": "600",
+              "position": "absolute",
+              "textAlign": "center",
+              "width": 28,
+            },
+            {
+              "left": 168.99318574928085,
+              "top": 35.92764457434015,
+            },
+            false,
+          ]
+        }
+      >
+        5
+      </Text>
+      <Text
+        style={
+          [
+            {
+              "color": "#444",
+              "fontSize": 12,
+              "fontWeight": "600",
+              "position": "absolute",
+              "textAlign": "center",
+              "width": 28,
+            },
+            {
+              "left": 43.00681425071915,
+              "top": 35.92764457434015,
+            },
+            {
+              "color": "#fff",
+              "fontSize": 14,
+              "fontWeight": "900",
+            },
+          ]
+        }
+      >
+        5
+      </Text>
+      <Text
+        style={
+          [
+            {
+              "color": "#444",
+              "fontSize": 12,
+              "fontWeight": "600",
+              "position": "absolute",
+              "textAlign": "center",
+              "width": 28,
+            },
+            {
+              "left": 139.51797404591554,
+              "top": 18.91012316298098,
+            },
+            false,
+          ]
+        }
+      >
+        7
+      </Text>
+      <Text
+        style={
+          [
+            {
+              "color": "#444",
+              "fontSize": 12,
+              "fontWeight": "600",
+              "position": "absolute",
+              "textAlign": "center",
+              "width": 28,
+            },
+            {
+              "left": 72.48202595408446,
+              "top": 18.91012316298098,
+            },
+            false,
+          ]
+        }
+      >
+        7
+      </Text>
+      <Text
+        style={
+          [
+            {
+              "color": "#444",
+              "fontSize": 12,
+              "fontWeight": "600",
+              "position": "absolute",
+              "textAlign": "center",
+              "width": 28,
+            },
+            {
+              "left": 114.54126278927049,
+              "top": 13.372919587008937,
+            },
+            false,
+          ]
+        }
+      >
+        9
+      </Text>
+      <Text
+        style={
+          [
+            {
+              "color": "#444",
+              "fontSize": 12,
+              "fontWeight": "600",
+              "position": "absolute",
+              "textAlign": "center",
+              "width": 28,
+            },
+            {
+              "left": 97.4587372107295,
+              "top": 13.372919587008937,
+            },
+            false,
+          ]
+        }
+      >
+        9
+      </Text>
+    </View>
+    <View
+      pointerEvents="none"
+      style={
+        {
+          "alignItems": "center",
+          "bottom": 0,
+          "justifyContent": "center",
+          "left": 0,
+          "position": "absolute",
+          "right": 0,
+          "top": 0,
+        }
+      }
+    >
+      <Text
+        style={
+          {
+            "color": "#e63946",
+            "fontSize": 20,
+            "fontWeight": "700",
+            "letterSpacing": 1,
+          }
+        }
+      >
+        L  5
+      </Text>
+    </View>
+    <View
+      pointerEvents="none"
+      style={
+        [
+          {
+            "height": 240,
+            "left": 0,
+            "position": "absolute",
+            "top": 0,
+            "width": 240,
+          },
+          {
+            "transform": [
+              {
+                "rotate": "-45deg",
+              },
+            ],
+          },
+        ]
+      }
+    >
+      <View
+        style={
+          {
+            "borderLeftColor": "transparent",
+            "borderLeftWidth": 8,
+            "borderRightColor": "transparent",
+            "borderRightWidth": 8,
+            "borderTopColor": "#e63946",
+            "borderTopWidth": 16,
+            "height": 0,
+            "left": 112,
+            "position": "absolute",
+            "top": 0,
+            "width": 0,
+          }
+        }
+      />
+    </View>
+  </View>
+</View>
+`;
