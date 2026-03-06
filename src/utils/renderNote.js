@@ -1,47 +1,78 @@
 /**
- * Renders a pace note to a display string.
- * Order: [pre-note decorators] [direction/severity] [duration] [other decorators] [joiner]
+ * @module renderNote
+ * Converts pace note objects into display/TTS strings.
+ */
+
+/**
+ * Renders a pace note to a display/TTS string.
+ * Order: [caution decs] [direction/severity] [duration] [other decs] [freetext] [joiner]
+ *        [joiner-caution-decs] [joiner-other-decs]
  *
- * @param {object}   note           - pace_note row (decorators as array)
- * @param {string}   displayOrder   - "direction_first" | "severity_first"
- * @param {string[]} preNoteDecs    - decorator values that render BEFORE direction/severity
- *                                   (case-insensitive match). Defaults to ['!','!!','!!!','Care'].
+ * Caution decorators (!, !!, !!!, Care) always render before direction/severity — hardcoded.
+ *
+ * @param {object}      note         - pace_note row (decorators + joiner_decorators as arrays)
+ * @param {string}      displayOrder - "direction_first" | "severity_first"
+ * @param {object|null} audibleMap   - optional { value → audible } for TTS output
  * @returns {string}
  */
-export function renderNote(
-  note,
-  displayOrder = 'direction_first',
-  preNoteDecs = ['!', '!!', '!!!', 'Care'],
-) {
-  const preSet = new Set(preNoteDecs.map(d => d.toLowerCase()));
+
+const CAUTION_DECS = new Set(['!', '!!', '!!!', 'care']);
+
+export function renderNote(note, displayOrder = 'direction_first', audibleMap = null) {
+  const toA = (v) => (audibleMap && audibleMap[v] ? audibleMap[v] : v);
+
   const decorators = Array.isArray(note.decorators) ? note.decorators : [];
-  const before = decorators.filter(d => preSet.has(d.toLowerCase()));
-  const after  = decorators.filter(d => !preSet.has(d.toLowerCase()));
+  const before = decorators.filter((d) => CAUTION_DECS.has(d.toLowerCase()));
+  const after = decorators.filter((d) => !CAUTION_DECS.has(d.toLowerCase()));
 
   const parts = [];
 
-  // 1. Pre-note decorators
-  parts.push(...before);
+  // 1. Caution decorators (!, !!, !!!, Care)
+  before.forEach((d) => parts.push(toA(d)));
 
   // 2. Direction / severity
   const dir = note.direction ?? '';
-  const sev = note.severity  ?? '';
+  const sev = note.severity ?? '';
   if (displayOrder === 'direction_first') {
-    if (dir) parts.push(dir);
-    if (sev) parts.push(sev);
+    if (dir) parts.push(toA(dir));
+    if (sev) parts.push(toA(sev));
   } else {
-    if (sev) parts.push(sev);
-    if (dir) parts.push(dir);
+    if (sev) parts.push(toA(sev));
+    if (dir) parts.push(toA(dir));
   }
 
   // 3. Duration
-  if (note.duration) parts.push(note.duration);
+  if (note.duration) parts.push(toA(note.duration));
 
-  // 4. Remaining decorators
-  parts.push(...after);
+  // 4. Remaining note decorators
+  after.forEach((d) => parts.push(toA(d)));
 
-  // 5. Joiner
-  if (note.joiner) parts.push(note.joiner);
+  // 5. Note freetext (belongs to the note, before the joiner)
+  if (note.notes) parts.push(note.notes);
+
+  // 6. Joiner
+  if (note.joiner) parts.push(toA(note.joiner));
+
+  // 7. Joiner decorators: cautions first, then others
+  const joinerDecs = Array.isArray(note.joiner_decorators) ? note.joiner_decorators : [];
+  const joinerBefore = joinerDecs.filter((d) => CAUTION_DECS.has(d.toLowerCase()));
+  const joinerAfter = joinerDecs.filter((d) => !CAUTION_DECS.has(d.toLowerCase()));
+  joinerBefore.forEach((d) => parts.push(toA(d)));
+  joinerAfter.forEach((d) => parts.push(toA(d)));
+
+  // In TTS mode, insert comma between consecutive numeric tokens to prevent
+  // e.g. "2 200" being read as "2200" instead of "Two, Two Hundred"
+  if (audibleMap !== null) {
+    let result = '';
+    for (let i = 0; i < parts.length; i++) {
+      if (i > 0) {
+        const sep = /^\d+$/.test(parts[i - 1]) && /^\d+$/.test(parts[i]) ? ', ' : ' ';
+        result += sep;
+      }
+      result += parts[i];
+    }
+    return result.trim();
+  }
 
   return parts.join(' ').trim();
 }

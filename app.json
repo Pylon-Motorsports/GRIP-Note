@@ -4,31 +4,44 @@
     "slug": "grip-note",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/grip_logo.png",
     "userInterfaceStyle": "dark",
     "splash": {
       "image": "./assets/bg-autumn.png",
       "resizeMode": "cover",
       "backgroundColor": "#000000"
     },
-    "ios": {
-      "supportsTablet": true
-    },
     "android": {
+      "package": "com.grip.note",
+      "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
+        "foregroundImage": "./assets/grip_logo.png",
+        "backgroundColor": "#000000"
+      },
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "plugins": [
       "expo-sqlite",
       "@react-native-community/datetimepicker",
-      "expo-sharing"
-    ]
+      "expo-sharing",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "GRIP Note uses GPS to track distance during recce and rally stages."
+        }
+      ],
+      ["expo-speech-recognition", {
+        "microphonePermission": "GRIP Note uses the microphone to capture spoken pacenotes.",
+        "speechRecognitionPermission": "GRIP Note uses speech recognition to convert spoken notes into text."
+      }]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "fdd381ce-f292-436a-b0d5-b6ee70966a73"
+      }
+    }
   }
 }

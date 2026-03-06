@@ -1,30 +1,50 @@
+/**
+ * @module RallyList
+ * Expandable rally → stage list with long-press actions (rename, duplicate, delete).
+ * Supports creating rallies/stages inline and importing .grip.json files.
+ */
 import React, { useCallback, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, TextInput,
-  Modal, StyleSheet, Alert, SectionList, Platform, ScrollView,
+  View,
+  Text,
+  TouchableOpacity,
+  TextInput,
+  Modal,
+  StyleSheet,
+  Alert,
+  SectionList,
+  Platform,
+  ScrollView,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useFocusEffect } from '@react-navigation/native';
 import {
-  getRallies, createRally, updateRally, deleteRally,
-  getStages, createStage, updateStage, deleteStage,
-  duplicateRally, duplicateStage,
+  getRallies,
+  createRally,
+  updateRally,
+  deleteRally,
+  getStages,
+  createStage,
+  updateStage,
+  deleteStage,
+  duplicateRally,
+  duplicateStage,
 } from '../db/rallies';
 import { getSetting } from '../db/database';
+import { importRally } from '../utils/importExport';
 
-// Same decorator list as WritingEditor — used for the pre-note selector
-const ALL_DECORATORS = [
-  '!', '!!', '!!!', 'Care', 'Brow', 'Opens', 'Maybe', 'Over Crest', 'Jump',
-  "Don't Cut", 'Keep In', 'Keep Out', 'Flat', 'Narrows', 'Widens', 'Slippery', 'Bumps',
-];
-
-const DEFAULT_PRE_NOTE = ['!', '!!', '!!!', 'Care'];
-
-function toDateStr(d) { return d.toISOString().split('T')[0]; }
-function parseDate(s) { return s ? new Date(s + 'T00:00:00') : new Date(); }
+/** Converts a Date to ISO date string (YYYY-MM-DD). */
+function toDateStr(d) {
+  return d.toISOString().split('T')[0];
+}
+/** Parses an ISO date string into a Date (defaults to today). */
+function parseDate(s) {
+  return s ? new Date(s + 'T00:00:00') : new Date();
+}
 
 export default function RallyList() {
   const [sections, setSections] = useState([]);
+  const [importing, setImporting] = useState(false);
   const [expanded, setExpanded] = useState({});
 
   // Create/edit modal
@@ -39,37 +59,52 @@ export default function RallyList() {
   // Rally preferences (within modal)
   const [prefDisplayOrder, setPrefDisplayOrder] = useState('direction_first');
   const [prefOdoUnit, setPrefOdoUnit] = useState('metres');
-  const [prefPreNoteDecs, setPrefPreNoteDecs] = useState(DEFAULT_PRE_NOTE);
 
-  useFocusEffect(useCallback(() => { load(); }, []));
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, []),
+  );
+
+  async function doImport() {
+    setImporting(true);
+    try {
+      const result = await importRally();
+      if (result) {
+        Alert.alert(
+          'Import complete',
+          `${result.rallyName} — ${result.stageCount} stage${result.stageCount !== 1 ? 's' : ''}, ${result.noteCount} notes`,
+        );
+        load();
+      }
+    } catch (e) {
+      Alert.alert('Import failed', e.message);
+    } finally {
+      setImporting(false);
+    }
+  }
 
   async function load() {
     const rallies = await getRallies();
     const built = await Promise.all(
-      rallies.map(async (r) => ({ rally: r, data: await getStages(r.id) }))
+      rallies.map(async (r) => ({ rally: r, data: await getStages(r.id) })),
     );
     setSections(built);
   }
 
   function toggleExpand(rallyId) {
-    setExpanded(prev => ({ ...prev, [rallyId]: !prev[rallyId] }));
+    setExpanded((prev) => ({ ...prev, [rallyId]: !prev[rallyId] }));
   }
 
   // ── Open modals ────────────────────────────────────────────────────────────
 
   async function openCreateRally() {
-    // Pre-populate from global defaults
-    const [order, unit, decs] = await Promise.all([
-      getSetting('display_order'),
-      getSetting('odo_unit'),
-      getSetting('pre_note_decs'),
-    ]);
+    const [order, unit] = await Promise.all([getSetting('display_order'), getSetting('odo_unit')]);
     setInputName('');
     setInputDriver('');
     setPickedDate(new Date());
     setPrefDisplayOrder(order ?? 'direction_first');
     setPrefOdoUnit(unit ?? 'metres');
-    setPrefPreNoteDecs(decs ? JSON.parse(decs) : DEFAULT_PRE_NOTE);
     setEditTargetId(null);
     setModal('createRally');
   }
@@ -80,7 +115,6 @@ export default function RallyList() {
     setPickedDate(parseDate(rally.date));
     setPrefDisplayOrder(rally.display_order ?? 'direction_first');
     setPrefOdoUnit(rally.odo_unit ?? 'metres');
-    setPrefPreNoteDecs(rally.pre_note_decs ? JSON.parse(rally.pre_note_decs) : DEFAULT_PRE_NOTE);
     setEditTargetId(rally.id);
     setModal('editRally');
   }
@@ -108,14 +142,6 @@ export default function RallyList() {
     setShowDatePicker(false);
   }
 
-  // ── Toggle a decorator in the pre-note list ────────────────────────────────
-
-  function togglePreNoteDec(dec) {
-    setPrefPreNoteDecs(prev =>
-      prev.includes(dec) ? prev.filter(d => d !== dec) : [...prev, dec]
-    );
-  }
-
   // ── Actions ────────────────────────────────────────────────────────────────
 
   async function handleSave() {
@@ -123,18 +149,20 @@ export default function RallyList() {
     switch (modal) {
       case 'createRally':
         await createRally({
-          name: inputName.trim(), date: toDateStr(pickedDate),
+          name: inputName.trim(),
+          date: toDateStr(pickedDate),
           driver: inputDriver.trim() || null,
-          displayOrder: prefDisplayOrder, odoUnit: prefOdoUnit,
-          preNoteDecs: prefPreNoteDecs,
+          displayOrder: prefDisplayOrder,
+          odoUnit: prefOdoUnit,
         });
         break;
       case 'editRally':
         await updateRally(editTargetId, {
-          name: inputName.trim(), date: toDateStr(pickedDate),
+          name: inputName.trim(),
+          date: toDateStr(pickedDate),
           driver: inputDriver.trim() || null,
-          displayOrder: prefDisplayOrder, odoUnit: prefOdoUnit,
-          preNoteDecs: prefPreNoteDecs,
+          displayOrder: prefDisplayOrder,
+          odoUnit: prefOdoUnit,
         });
         break;
       case 'createStage':
@@ -152,7 +180,11 @@ export default function RallyList() {
     Alert.alert(rally.name, '', [
       { text: 'Edit', onPress: () => openEditRally(rally) },
       { text: 'Duplicate', onPress: () => confirmDuplicateRally(rally) },
-      { text: 'Delete', style: 'destructive', onPress: () => confirmDeleteRally(rally.id, rally.name) },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => confirmDeleteRally(rally.id, rally.name),
+      },
       { text: 'Cancel', style: 'cancel' },
     ]);
   }
@@ -161,7 +193,11 @@ export default function RallyList() {
     Alert.alert(stage.name, '', [
       { text: 'Edit', onPress: () => openEditStage(stage) },
       { text: 'Duplicate', onPress: () => confirmDuplicateStage(stage) },
-      { text: 'Delete', style: 'destructive', onPress: () => confirmDeleteStage(stage.id, stage.name) },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => confirmDeleteStage(stage.id, stage.name),
+      },
       { text: 'Cancel', style: 'cancel' },
     ]);
   }
@@ -169,36 +205,65 @@ export default function RallyList() {
   function confirmDeleteRally(id, name) {
     Alert.alert('Delete Rally', `Delete "${name}" and all its stages and notes?`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => { await deleteRally(id); load(); } },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteRally(id);
+          load();
+        },
+      },
     ]);
   }
 
   function confirmDeleteStage(id, name) {
     Alert.alert('Delete Stage', `Delete "${name}" and all its notes?`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => { await deleteStage(id); load(); } },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteStage(id);
+          load();
+        },
+      },
     ]);
   }
 
   function confirmDuplicateRally(rally) {
     Alert.alert('Duplicate Rally', `Copy "${rally.name}" with all its stages and notes?`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Duplicate', onPress: async () => { await duplicateRally(rally.id); load(); } },
+      {
+        text: 'Duplicate',
+        onPress: async () => {
+          await duplicateRally(rally.id);
+          load();
+        },
+      },
     ]);
   }
 
   function confirmDuplicateStage(stage) {
     Alert.alert('Duplicate Stage', `Copy "${stage.name}" with all its note sets?`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Duplicate', onPress: async () => { await duplicateStage(stage.id); load(); } },
+      {
+        text: 'Duplicate',
+        onPress: async () => {
+          await duplicateStage(stage.id);
+          load();
+        },
+      },
     ]);
   }
 
   const isRallyModal = modal === 'createRally' || modal === 'editRally';
-  const modalTitle = {
-    createRally: 'New Rally', editRally: 'Edit Rally',
-    createStage: 'New Stage', editStage: 'Rename Stage',
-  }[modal] ?? '';
+  const modalTitle =
+    {
+      createRally: 'New Rally',
+      editRally: 'Edit Rally',
+      createStage: 'New Stage',
+      editStage: 'Rename Stage',
+    }[modal] ?? '';
 
   return (
     <View style={styles.container}>
@@ -216,14 +281,18 @@ export default function RallyList() {
             <View style={styles.rallyInfo}>
               <Text style={styles.rallyName}>{rally.name}</Text>
               <Text style={styles.rallyDate}>
-                {rally.date}{rally.driver ? `  ·  ${rally.driver}` : ''}
+                {rally.date}
+                {rally.driver ? `  ·  ${rally.driver}` : ''}
               </Text>
             </View>
             <View style={styles.rallyActions}>
               <TouchableOpacity style={styles.iconBtn} onPress={() => openEditRally(rally)}>
                 <Text style={styles.iconBtnText}>✎</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.addStageBtn} onPress={() => openCreateStage(rally.id)}>
+              <TouchableOpacity
+                style={styles.addStageBtn}
+                onPress={() => openCreateStage(rally.id)}
+              >
                 <Text style={styles.addStageBtnText}>+ Stage</Text>
               </TouchableOpacity>
               <Text style={styles.chevron}>{expanded[rally.id] ? '▲' : '▼'}</Text>
@@ -233,10 +302,7 @@ export default function RallyList() {
         renderItem={({ item: stage, section: { rally } }) => {
           if (!expanded[rally.id]) return null;
           return (
-            <TouchableOpacity
-              style={styles.stageRow}
-              onLongPress={() => stageLongPress(stage)}
-            >
+            <TouchableOpacity style={styles.stageRow} onLongPress={() => stageLongPress(stage)}>
               <Text style={styles.stageName}>{stage.name}</Text>
               <TouchableOpacity style={styles.iconBtn} onPress={() => openEditStage(stage)}>
                 <Text style={styles.iconBtnText}>✎</Text>
@@ -245,6 +311,10 @@ export default function RallyList() {
           );
         }}
       />
+
+      <TouchableOpacity style={styles.importFab} onPress={doImport} disabled={importing}>
+        <Text style={styles.importFabText}>{importing ? '…' : 'Import'}</Text>
+      </TouchableOpacity>
 
       <TouchableOpacity style={styles.fab} onPress={openCreateRally}>
         <Text style={styles.fabText}>+</Text>
@@ -330,27 +400,6 @@ export default function RallyList() {
                       onPress={() => setPrefOdoUnit('km')}
                     />
                   </View>
-
-                  <Text style={styles.prefLabel}>Decorators shown BEFORE the note</Text>
-                  <Text style={styles.prefHint}>
-                    All others appear after direction/severity.
-                  </Text>
-                  <View style={styles.chipWrap}>
-                    {ALL_DECORATORS.map(dec => {
-                      const active = prefPreNoteDecs.includes(dec);
-                      return (
-                        <TouchableOpacity
-                          key={dec}
-                          style={[styles.decChip, active && styles.decChipActive]}
-                          onPress={() => togglePreNoteDec(dec)}
-                        >
-                          <Text style={[styles.decChipText, active && styles.decChipTextActive]}>
-                            {dec}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
                 </>
               )}
 
@@ -389,8 +438,11 @@ const styles = StyleSheet.create({
   empty: { color: '#555', textAlign: 'center', marginTop: 40, fontSize: 14 },
 
   rallyRow: {
-    flexDirection: 'row', alignItems: 'center',
-    padding: 16, borderBottomWidth: 1, borderBottomColor: '#222',
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#222',
     backgroundColor: '#111',
   },
   rallyInfo: { flex: 1 },
@@ -402,79 +454,121 @@ const styles = StyleSheet.create({
   iconBtnText: { color: '#555', fontSize: 16 },
 
   addStageBtn: {
-    borderWidth: 1, borderColor: '#ff9800', borderRadius: 4,
-    paddingHorizontal: 8, paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: '#ff9800',
+    borderRadius: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   addStageBtnText: { color: '#ff9800', fontSize: 12, fontWeight: '600' },
   chevron: { color: '#555', fontSize: 12, width: 14 },
 
   stageRow: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 12, paddingLeft: 32, paddingRight: 12,
-    borderBottomWidth: 1, borderBottomColor: '#1a1a1a',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingLeft: 32,
+    paddingRight: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1a1a1a',
     backgroundColor: '#0a0a0a',
   },
   stageName: { color: '#ccc', fontSize: 15, flex: 1 },
 
   fab: {
-    position: 'absolute', bottom: 24, right: 24,
-    width: 56, height: 56, borderRadius: 28,
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: '#e63946',
-    alignItems: 'center', justifyContent: 'center', elevation: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
   },
   fabText: { color: '#fff', fontSize: 28, lineHeight: 30 },
 
+  importFab: {
+    position: 'absolute',
+    bottom: 24,
+    right: 92,
+    height: 56,
+    borderRadius: 28,
+    paddingHorizontal: 18,
+    backgroundColor: '#2196f3',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+  },
+  importFabText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+
   modalOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.75)',
-    justifyContent: 'center', padding: 24,
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    justifyContent: 'center',
+    padding: 24,
   },
   modalCard: {
-    backgroundColor: '#1a1a1a', borderRadius: 12, padding: 20,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 20,
     maxHeight: '90%',
   },
   modalTitle: { color: '#fff', fontSize: 18, fontWeight: '700', marginBottom: 16 },
   input: {
-    borderWidth: 1, borderColor: '#333', borderRadius: 6,
-    padding: 10, color: '#fff', marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#333',
+    borderRadius: 6,
+    padding: 10,
+    color: '#fff',
+    marginBottom: 12,
   },
   dateTrigger: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    borderWidth: 1, borderColor: '#333', borderRadius: 6,
-    padding: 10, marginBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#333',
+    borderRadius: 6,
+    padding: 10,
+    marginBottom: 12,
   },
   dateTriggerLabel: { color: '#666', fontSize: 14 },
   dateTriggerValue: { color: '#fff', fontSize: 14, fontWeight: '600' },
 
   prefSectionLabel: {
-    color: '#e63946', fontSize: 11, fontWeight: '700',
-    letterSpacing: 1, textTransform: 'uppercase',
-    marginTop: 16, marginBottom: 10,
-    borderTopWidth: 1, borderTopColor: '#2a2a2a', paddingTop: 14,
+    color: '#e63946',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginTop: 16,
+    marginBottom: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#2a2a2a',
+    paddingTop: 14,
   },
   prefLabel: { color: '#888', fontSize: 12, marginBottom: 6 },
-  prefHint:  { color: '#444', fontSize: 11, marginBottom: 8 },
-
   toggleRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
   toggleBtn: {
-    flex: 1, borderWidth: 1, borderColor: '#333', borderRadius: 6,
-    padding: 10, backgroundColor: '#111',
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#333',
+    borderRadius: 6,
+    padding: 10,
+    backgroundColor: '#111',
   },
   toggleBtnActive: { borderColor: '#e63946', backgroundColor: 'rgba(230,57,70,0.1)' },
   toggleBtnLabel: { color: '#666', fontSize: 13 },
   toggleBtnLabelActive: { color: '#fff', fontWeight: '700' },
   toggleBtnExample: { color: '#444', fontSize: 11, fontFamily: 'monospace', marginTop: 2 },
 
-  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 },
-  decChip: {
-    borderWidth: 1, borderColor: '#333', borderRadius: 6,
-    paddingVertical: 5, paddingHorizontal: 9, backgroundColor: '#111',
-  },
-  decChipActive: { borderColor: '#2196f3', backgroundColor: 'rgba(33,150,243,0.15)' },
-  decChipText: { color: '#666', fontSize: 12 },
-  decChipTextActive: { color: '#fff', fontWeight: '700' },
-
   modalButtons: {
-    flexDirection: 'row', justifyContent: 'flex-end', gap: 20, marginTop: 8,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 20,
+    marginTop: 8,
   },
   cancel: { color: '#888', fontSize: 16 },
   confirm: { color: '#e63946', fontSize: 16, fontWeight: '700' },

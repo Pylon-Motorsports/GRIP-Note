@@ -1,7 +1,7 @@
 /**
- * @module WritingStageSelect
- * 3-step picker for Recce writing: rally → stage → note set.
- * Navigates to WritingEditor with the selected set_id.
+ * @module DriveStageSelect
+ * 3-step picker for Drive mode: rally → stage → note set.
+ * Navigates to DriveScreen with the selected set_id.
  * Route params: { rally? } — optional Rally to skip step 1.
  */
 import React, { useCallback, useState } from 'react';
@@ -30,7 +30,7 @@ import {
  * @param {Object} props
  * @param {Object} [props.route.params.rally] — pre-selected rally to skip step 1
  */
-export default function WritingStageSelect({ navigation, route }) {
+export default function DriveStageSelect({ navigation, route }) {
   const rally = route.params?.rally ?? null;
 
   const [step, setStep] = useState('rally');
@@ -41,10 +41,7 @@ export default function WritingStageSelect({ navigation, route }) {
   const [selectedStage, setSelectedStage] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Version-choice modal for existing sets
-  const [versionModal, setVersionModal] = useState(null); // set row | null
-
-  // New stage creation
+  const [versionModal, setVersionModal] = useState(null);
   const [stageModal, setStageModal] = useState(false);
   const [newStageName, setNewStageName] = useState('');
 
@@ -90,10 +87,9 @@ export default function WritingStageSelect({ navigation, route }) {
   }
 
   function openSet(setId) {
-    navigation.navigate('WritingEditor', { setId, stageId: selectedStage.id });
+    navigation.navigate('DriveScreen', { setId, stageId: selectedStage.id, rally: selectedRally });
   }
 
-  // Tap existing set → show choice modal
   function promptVersionChoice(set) {
     setVersionModal(set);
   }
@@ -104,7 +100,11 @@ export default function WritingStageSelect({ navigation, route }) {
     setLoading(true);
     const newSetId = await copyNoteSet(set.set_id);
     setLoading(false);
-    navigation.navigate('WritingEditor', { setId: newSetId, stageId: selectedStage.id });
+    navigation.navigate('DriveScreen', {
+      setId: newSetId,
+      stageId: selectedStage.id,
+      rally: selectedRally,
+    });
   }
 
   function openExisting() {
@@ -122,7 +122,7 @@ export default function WritingStageSelect({ navigation, route }) {
       driver: null,
     });
     setLoading(false);
-    navigation.navigate('WritingEditor', { setId, stageId: selectedStage.id });
+    navigation.navigate('DriveScreen', { setId, stageId: selectedStage.id, rally: selectedRally });
   }
 
   async function confirmNewStage() {
@@ -164,12 +164,11 @@ export default function WritingStageSelect({ navigation, route }) {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color="#e63946" />
+        <ActivityIndicator color="#00bcd4" />
       </View>
     );
   }
 
-  // ── Pick rally ─────────────────────────────────────────────────────────────
   if (step === 'rally') {
     return (
       <View style={styles.container}>
@@ -197,12 +196,10 @@ export default function WritingStageSelect({ navigation, route }) {
     );
   }
 
-  // ── Pick stage ─────────────────────────────────────────────────────────────
   if (step === 'stage') {
     return (
       <View style={styles.container}>
         <Breadcrumb />
-
         <TouchableOpacity
           style={styles.newStageBtn}
           onPress={() => {
@@ -212,7 +209,6 @@ export default function WritingStageSelect({ navigation, route }) {
         >
           <Text style={styles.newStageText}>+ New Stage</Text>
         </TouchableOpacity>
-
         {stages.length === 0 ? (
           <View style={styles.center}>
             <Text style={styles.empty}>No stages yet — tap + to add one.</Text>
@@ -228,8 +224,6 @@ export default function WritingStageSelect({ navigation, route }) {
             )}
           />
         )}
-
-        {/* New stage modal */}
         <Modal visible={stageModal} transparent animationType="fade">
           <View style={styles.modalOverlay}>
             <View style={styles.modalCard}>
@@ -258,16 +252,13 @@ export default function WritingStageSelect({ navigation, route }) {
     );
   }
 
-  // ── Pick or create note set ────────────────────────────────────────────────
   return (
     <View style={styles.container}>
       <Breadcrumb />
-
       <TouchableOpacity style={styles.newSetBtn} onPress={openNewSet}>
         <Text style={styles.newSetText}>+ New Note Set</Text>
-        <Text style={styles.newSetSub}>Start a fresh recce pass</Text>
+        <Text style={styles.newSetSub}>Start a fresh drive pass</Text>
       </TouchableOpacity>
-
       {sets.length > 0 && (
         <>
           <Text style={styles.sectionLabel}>Existing Sets</Text>
@@ -282,19 +273,15 @@ export default function WritingStageSelect({ navigation, route }) {
           />
         </>
       )}
-
-      {/* Version choice modal */}
       <Modal visible={versionModal !== null} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Open Note Set</Text>
             <Text style={styles.modalSub}>{versionModal ? formatSetLabel(versionModal) : ''}</Text>
-
             <TouchableOpacity style={styles.choiceBtn} onPress={openExisting}>
               <Text style={styles.choiceBtnLabel}>Edit This Set</Text>
               <Text style={styles.choiceBtnDesc}>Modify notes in place</Text>
             </TouchableOpacity>
-
             <TouchableOpacity
               style={[styles.choiceBtn, styles.choiceBtnNew]}
               onPress={openNewVersion}
@@ -302,9 +289,8 @@ export default function WritingStageSelect({ navigation, route }) {
               <Text style={styles.choiceBtnLabel}>New Version</Text>
               <Text style={styles.choiceBtnDesc}>Copy and edit — original preserved</Text>
             </TouchableOpacity>
-
             <TouchableOpacity style={styles.cancelRow} onPress={() => setVersionModal(null)}>
-              <Text style={styles.cancelRowText}>Cancel</Text>
+              <Text style={styles.cancelText}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -312,6 +298,8 @@ export default function WritingStageSelect({ navigation, route }) {
     </View>
   );
 }
+
+const ACCENT = '#00bcd4';
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
@@ -328,7 +316,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0d0d0d',
   },
   breadcrumbText: { color: '#aaa', fontSize: 13, flex: 1 },
-  breadcrumbBack: { color: '#e63946', fontSize: 13, fontWeight: '600' },
+  breadcrumbBack: { color: ACCENT, fontSize: 13, fontWeight: '600' },
 
   item: { padding: 18, borderBottomWidth: 1, borderBottomColor: '#1a1a1a' },
   itemName: { color: '#fff', fontSize: 17, fontWeight: '600' },
@@ -339,10 +327,10 @@ const styles = StyleSheet.create({
     padding: 18,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#e63946',
-    backgroundColor: 'rgba(230,57,70,0.08)',
+    borderColor: ACCENT,
+    backgroundColor: 'rgba(0,188,212,0.08)',
   },
-  newSetText: { color: '#e63946', fontSize: 17, fontWeight: '700' },
+  newSetText: { color: ACCENT, fontSize: 17, fontWeight: '700' },
   newSetSub: { color: '#888', fontSize: 12, marginTop: 3 },
 
   sectionLabel: {
@@ -386,7 +374,7 @@ const styles = StyleSheet.create({
   },
   modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 20 },
   cancelText: { color: '#888', fontSize: 16 },
-  confirmText: { color: '#e63946', fontSize: 16, fontWeight: '700' },
+  confirmText: { color: ACCENT, fontSize: 16, fontWeight: '700' },
 
   choiceBtn: {
     padding: 16,
@@ -396,10 +384,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#111',
     marginBottom: 10,
   },
-  choiceBtnNew: { borderColor: '#e63946', backgroundColor: 'rgba(230,57,70,0.08)' },
+  choiceBtnNew: { borderColor: ACCENT, backgroundColor: 'rgba(0,188,212,0.08)' },
   choiceBtnLabel: { color: '#fff', fontSize: 16, fontWeight: '700' },
   choiceBtnDesc: { color: '#666', fontSize: 12, marginTop: 3 },
-
   cancelRow: { alignItems: 'center', paddingTop: 8 },
-  cancelRowText: { color: '#555', fontSize: 15 },
 });

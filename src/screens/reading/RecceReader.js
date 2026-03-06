@@ -1,3 +1,8 @@
+/**
+ * @module RecceReader
+ * Placeholder for Recce reading mode (coming soon).
+ * Route params: { setId } — UUID of the note set.
+ */
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
@@ -5,7 +10,10 @@ export default function RecceReader({ route }) {
   const { setId } = route.params ?? {};
   return (
     <View style={styles.container}>
-      <Text style={styles.placeholder}>Recce Reader{'\n'}Set: {setId}{'\n'}(coming soon)</Text>
+      <Text style={styles.placeholder}>
+        Recce Reader{'\n'}Set: {setId}
+        {'\n'}(coming soon)
+      </Text>
     </View>
   );
 }
