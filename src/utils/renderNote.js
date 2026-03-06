@@ -5,7 +5,7 @@
 
 /**
  * Renders a pace note to a display/TTS string.
- * Order: [caution decs] [direction/severity] [duration] [other decs] [freetext] [joiner]
+ * Order: [caution decs] [direction/severity] [duration] [freetext] [other decs] [joiner]
  *        [joiner-caution-decs] [joiner-other-decs]
  *
  * Caution decorators (!, !!, !!!, Care) always render before direction/severity — hardcoded.
@@ -44,11 +44,11 @@ export function renderNote(note, displayOrder = 'direction_first', audibleMap = 
   // 3. Duration
   if (note.duration) parts.push(toA(note.duration));
 
-  // 4. Remaining note decorators
-  after.forEach((d) => parts.push(toA(d)));
-
-  // 5. Note freetext (belongs to the note, before the joiner)
+  // 4. Note freetext (distances, landmarks — stays close to severity)
   if (note.notes) parts.push(note.notes);
+
+  // 5. Remaining note decorators
+  after.forEach((d) => parts.push(toA(d)));
 
   // 6. Joiner
   if (note.joiner) parts.push(toA(note.joiner));
@@ -59,6 +59,9 @@ export function renderNote(note, displayOrder = 'direction_first', audibleMap = 
   const joinerAfter = joinerDecs.filter((d) => !CAUTION_DECS.has(d.toLowerCase()));
   joinerBefore.forEach((d) => parts.push(toA(d)));
   joinerAfter.forEach((d) => parts.push(toA(d)));
+
+  // 8. Joiner freetext (e.g. severity after > / <)
+  if (note.joiner_notes) parts.push(note.joiner_notes);
 
   // In TTS mode, insert comma between consecutive numeric tokens to prevent
   // e.g. "2 200" being read as "2200" instead of "Two, Two Hundred"

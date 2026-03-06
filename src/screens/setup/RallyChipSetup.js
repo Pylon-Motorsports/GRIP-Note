@@ -100,17 +100,8 @@ export default function RallyChipSetup({ route, navigation }) {
       );
       return;
     }
-    Alert.alert('Delete Chip', `Remove "${chip.value}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          await deleteChip(chip.id);
-          loadChips();
-        },
-      },
-    ]);
+    await deleteChip(chip.id);
+    loadChips();
   }
 
   async function handleMove(chip, direction) {
@@ -217,7 +208,6 @@ export default function RallyChipSetup({ route, navigation }) {
               isFirst={index === 0}
               isLast={index === chips.length - 1}
               showAngle={isSeverity}
-              onSaved={() => loadChips()}
               onMove={(dir) => handleMove(item, dir)}
               onDelete={() => handleDelete(item)}
             />
@@ -299,7 +289,7 @@ export default function RallyChipSetup({ route, navigation }) {
 
 // ── Inline-editable chip row ─────────────────────────────────────────────────
 
-function ChipEditRow({ chip, isFirst, isLast, showAngle, onSaved, onMove, onDelete }) {
+function ChipEditRow({ chip, isFirst, isLast, showAngle, onMove, onDelete }) {
   const [value, setValue] = useState(chip.value);
   const [audible, setAudible] = useState(chip.audible ?? '');
   const [angle, setAngle] = useState(chip.angle != null ? String(chip.angle) : '');
@@ -319,7 +309,9 @@ function ChipEditRow({ chip, isFirst, isLast, showAngle, onSaved, onMove, onDele
     }
     if (v === chip.value && a === (chip.audible ?? '')) return;
     await updateChip(chip.id, v, a || null);
-    onSaved();
+    // Update local chip reference so next blur is a no-op
+    chip.value = v;
+    chip.audible = a || null;
   }
 
   async function saveAngle() {
@@ -331,7 +323,7 @@ function ChipEditRow({ chip, isFirst, isLast, showAngle, onSaved, onMove, onDele
     }
     if (n === chip.angle) return;
     await updateChipAngle(chip.id, n);
-    onSaved();
+    chip.angle = n;
   }
 
   return (

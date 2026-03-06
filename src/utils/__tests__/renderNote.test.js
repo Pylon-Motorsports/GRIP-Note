@@ -133,7 +133,7 @@ describe('renderNote', () => {
         joiner: '→',
         joiner_decorators: ['!!', 'Narrows'],
       }),
-    ).toBe('! L 3 Long Brow Opens past gate → !! Narrows');
+    ).toBe('! L 3 Long past gate Brow Opens → !! Narrows');
   });
 });
 

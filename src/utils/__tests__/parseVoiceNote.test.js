@@ -1,4 +1,4 @@
-import { parseVoiceNote, mergeVoiceResult } from '../parseVoiceNote';
+import { parseVoiceNote, parseMultiNote, mergeVoiceResult } from '../parseVoiceNote';
 
 // Minimal chip definitions matching DEFAULT_CHIP_SEEDS structure
 const CHIPS = {
@@ -134,5 +134,253 @@ describe('mergeVoiceResult', () => {
     const voiced = { decorators: [], joiner_decorators: [] };
     const merged = mergeVoiceResult(current, voiced);
     expect(merged.decorators).toEqual(['Brow']);
+  });
+});
+
+// ── Note accumulation (simulates DriveScreen handleStructuredResult) ──────────
+
+const SAVE_JOINERS = /^[><]$|opens|tightens/i;
+
+const DRIVE_CHIPS = {
+  ...CHIPS,
+  joiner: [
+    { value: '→', audible: 'Into' },
+    { value: '>', audible: 'Opens' },
+    { value: '<', audible: 'Tightens' },
+    { value: '100', audible: null },
+    { value: '200', audible: null },
+  ],
+};
+
+const EMPTY_NOTE = {
+  direction: null,
+  severity: null,
+  duration: null,
+  decorators: [],
+  joiner: null,
+  joiner_decorators: [],
+  notes: '',
+  joiner_notes: '',
+};
+
+/**
+ * Simulates DriveScreen's handleStructuredResult logic:
+ * accumulates voice inputs, saves on new direction/caution or SAVE_JOINERS.
+ */
+function simulateAccumulation(transcripts, chips = DRIVE_CHIPS) {
+  const saved = [];
+  let cur = { ...EMPTY_NOTE };
+
+  const cautionValues = new Set(
+    (chips.caution_decorator ?? []).map((c) => c.value),
+  );
+
+  for (const transcript of transcripts) {
+    const parsed = parseMultiNote(transcript, chips);
+    for (const note of parsed) {
+      const startsNew =
+        !!note.direction || note.decorators?.some((d) => cautionValues.has(d));
+
+      if (startsNew && (cur.direction || cur.severity || cur.decorators?.length)) {
+        saved.push({ ...cur });
+        cur = { ...EMPTY_NOTE };
+      }
+
+      cur = mergeVoiceResult(cur, note);
+
+      if (cur.joiner && SAVE_JOINERS.test(cur.joiner)) {
+        saved.push({ ...cur });
+        cur = { ...EMPTY_NOTE };
+      }
+    }
+  }
+
+  return { saved, current: cur };
+}
+
+describe('regular note accumulation', () => {
+  it('builds a note across direction → severity → joiner inputs', () => {
+    const { saved, current } = simulateAccumulation(['left', 'three', 'into']);
+
+    // Nothing saved yet — note is still building (into is not a SAVE_JOINER)
+    expect(saved).toHaveLength(0);
+    expect(current.direction).toBe('L');
+    expect(current.severity).toBe('3');
+    expect(current.joiner).toBe('→');
+  });
+
+  it('saves previous note when new direction is spoken', () => {
+    const { saved, current } = simulateAccumulation([
+      'left', 'three', 'into',   // first note
+      'right', 'five',            // triggers save of first, starts second
+    ]);
+
+    expect(saved).toHaveLength(1);
+    expect(saved[0].direction).toBe('L');
+    expect(saved[0].severity).toBe('3');
+    expect(saved[0].joiner).toBe('→');
+
+    expect(current.direction).toBe('R');
+    expect(current.severity).toBe('5');
+  });
+
+  it('parses direction + severity in single utterance', () => {
+    const { saved, current } = simulateAccumulation(['left three']);
+
+    expect(saved).toHaveLength(0);
+    expect(current.direction).toBe('L');
+    expect(current.severity).toBe('3');
+  });
+
+  it('multi-note utterance splits and saves correctly', () => {
+    const { saved, current } = simulateAccumulation(['left three into right five']);
+
+    // "left three into" saved, "right five" is current
+    expect(saved).toHaveLength(1);
+    expect(saved[0].direction).toBe('L');
+    expect(saved[0].severity).toBe('3');
+    expect(saved[0].joiner).toBe('→');
+
+    expect(current.direction).toBe('R');
+    expect(current.severity).toBe('5');
+  });
+
+  it('standalone joiner adds to accumulated note (hasContent fix)', () => {
+    const { current } = simulateAccumulation(['left', 'three', 'into']);
+
+    expect(current.joiner).toBe('→');
+  });
+
+  it('caution triggers save of previous note', () => {
+    const { saved, current } = simulateAccumulation([
+      'left three',
+      'caution right five',
+    ]);
+
+    expect(saved).toHaveLength(1);
+    expect(saved[0].direction).toBe('L');
+    expect(saved[0].severity).toBe('3');
+
+    expect(current.decorators).toContain('!');
+    expect(current.direction).toBe('R');
+    expect(current.severity).toBe('5');
+  });
+});
+
+describe('opens/tightens (SAVE_JOINERS)', () => {
+  it('opens immediately saves the current note', () => {
+    const { saved, current } = simulateAccumulation(['right five opens']);
+
+    expect(saved).toHaveLength(1);
+    expect(saved[0].direction).toBe('R');
+    expect(saved[0].severity).toBe('5');
+    expect(saved[0].joiner).toBe('>');
+
+    // Current is empty — ready for severity-only follow-up
+    expect(current.direction).toBeNull();
+    expect(current.severity).toBeNull();
+  });
+
+  it('tightens immediately saves the current note', () => {
+    const { saved, current } = simulateAccumulation(['left three tightens']);
+
+    expect(saved).toHaveLength(1);
+    expect(saved[0].direction).toBe('L');
+    expect(saved[0].severity).toBe('3');
+    expect(saved[0].joiner).toBe('<');
+
+    expect(current.direction).toBeNull();
+  });
+
+  it('following note after opens only needs severity', () => {
+    const { saved, current } = simulateAccumulation([
+      'right five opens',
+      'three',  // severity only — no direction needed
+    ]);
+
+    expect(saved).toHaveLength(1);
+    expect(saved[0].direction).toBe('R');
+    expect(saved[0].severity).toBe('5');
+    expect(saved[0].joiner).toBe('>');
+
+    // Second note accumulates with just severity
+    expect(current.direction).toBeNull();
+    expect(current.severity).toBe('3');
+  });
+
+  it('full sequence: R5 opens 3 into L3', () => {
+    const { saved, current } = simulateAccumulation([
+      'right five opens',   // saved immediately
+      'three into',         // accumulates (into is not SAVE_JOINER)
+      'left three',         // triggers save of previous, starts new
+    ]);
+
+    expect(saved).toHaveLength(2);
+
+    // First: R 5 >
+    expect(saved[0].direction).toBe('R');
+    expect(saved[0].severity).toBe('5');
+    expect(saved[0].joiner).toBe('>');
+
+    // Second: (no dir) 3 →
+    expect(saved[1].direction).toBeNull();
+    expect(saved[1].severity).toBe('3');
+    expect(saved[1].joiner).toBe('→');
+
+    // Current: L 3
+    expect(current.direction).toBe('L');
+    expect(current.severity).toBe('3');
+  });
+
+  it('opens + following severity across separate utterances', () => {
+    // In practice, opens and the follow-up severity come from separate voice presses
+    const { saved, current } = simulateAccumulation([
+      'right five opens',
+      'three into',
+    ]);
+
+    expect(saved).toHaveLength(1);
+    expect(saved[0].direction).toBe('R');
+    expect(saved[0].severity).toBe('5');
+    expect(saved[0].joiner).toBe('>');
+
+    expect(current.severity).toBe('3');
+    expect(current.joiner).toBe('→');
+    expect(current.direction).toBeNull();
+  });
+});
+
+describe('parseMultiNote', () => {
+  it('returns empty array for empty input', () => {
+    expect(parseMultiNote('', CHIPS)).toEqual([]);
+    expect(parseMultiNote(null, CHIPS)).toEqual([]);
+  });
+
+  it('parses standalone joiner (hasContent includes joiner)', () => {
+    const results = parseMultiNote('into', CHIPS);
+    expect(results).toHaveLength(1);
+    expect(results[0].joiner).toBe('→');
+  });
+
+  it('splits multi-direction utterance into separate notes', () => {
+    const results = parseMultiNote('left three right five', CHIPS);
+    expect(results).toHaveLength(2);
+    expect(results[0].direction).toBe('L');
+    expect(results[0].severity).toBe('3');
+    expect(results[1].direction).toBe('R');
+    expect(results[1].severity).toBe('5');
+  });
+
+  it('compound number splitting: "220" → severity 2 + freetext 20', () => {
+    // "left 220" normalizes to "left 2 20" → direction L, severity matched
+    const results = parseMultiNote('left 220', {
+      ...CHIPS,
+      severity: [{ value: '2', audible: null }, ...CHIPS.severity],
+    });
+    expect(results).toHaveLength(1);
+    expect(results[0].direction).toBe('L');
+    expect(results[0].severity).toBe('2');
+    // "20" should be in notes as freetext
+    expect(results[0].notes).toContain('20');
   });
 });

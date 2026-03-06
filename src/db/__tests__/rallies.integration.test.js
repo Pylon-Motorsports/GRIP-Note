@@ -10,6 +10,7 @@ jest.mock('../database', () => {
       }
       return _db;
     }),
+    getSetting: jest.fn(async () => null),
     __resetDb: async () => {
       _db = helper.createTestDb();
       await helper.initSchema(_db);

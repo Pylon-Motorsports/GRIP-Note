@@ -1,7 +1,8 @@
 /**
  * @module DriveScreen
- * Drive mode — writes pace notes using phone tilt (compass dial) and voice input.
- * Tilt auto-detects direction + severity; voice fills remaining fields.
+ * Drive mode — writes pace notes using voice input with compass dial for reference.
+ * Two voice modes: structured (parses chips, accumulates across presses, saves on
+ * new direction/caution) and freeform (raw transcript → notes field).
  * Route params: { setId, stageId?, rally? }
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -13,7 +14,6 @@ import {
   StyleSheet,
   StatusBar,
   Alert,
-  NativeModules,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -27,15 +27,25 @@ import {
 } from '../../db/paceNotes';
 import { getAllChips } from '../../db/rallyChips';
 import { renderNote } from '../../utils/renderNote';
-import { parseVoiceNote, mergeVoiceResult } from '../../utils/parseVoiceNote';
+import { parseMultiNote, mergeVoiceResult } from '../../utils/parseVoiceNote';
 import { useDeviceTilt } from '../../hooks/useDeviceTilt';
+import { useGpsOdo } from '../../hooks/useGpsOdo';
 import GpsOdoBar from '../../components/GpsOdoBar';
 import CompassDial from '../../components/CompassDial';
 
 const ACCENT = '#00bcd4';
 
-// Check once at module load — no native module = Expo Go or missing dev build
-const SPEECH_AVAILABLE = !!NativeModules.ExpoSpeechRecognition;
+// Joiners that immediately save the current note (the following note only needs severity).
+const SAVE_JOINERS = /^[><]$|opens|tightens/i;
+
+// Check once at module load — try to import the native module
+let SPEECH_AVAILABLE = false;
+try {
+  const { ExpoSpeechRecognitionModule: mod } = require('expo-speech-recognition');
+  SPEECH_AVAILABLE = !!mod;
+} catch (_e) {
+  // Native module not linked — Expo Go or missing dev build
+}
 
 const EMPTY_NOTE = {
   direction: null,
@@ -64,73 +74,43 @@ function detectSeverity(angleDeg, angleMap) {
   return closest;
 }
 
-// ── VoiceSection — only rendered when SPEECH_AVAILABLE ───────────────────────
-// Keeps useSpeechRecognitionEvent hooks isolated so they're never called
-// in environments where the native module doesn't exist.
+// ── VoiceEngine — headless, only rendered when SPEECH_AVAILABLE ──────────────
+// Keeps useSpeechRecognitionEvent hooks isolated. Exposes start/stop via controlRef.
 
-function VoiceSection({ allChips, onResult, onTranscript, onListening, onCleanup }) {
+function VoiceEngine({ onResult, onListening, controlRef }) {
   const {
     ExpoSpeechRecognitionModule,
     useSpeechRecognitionEvent,
   } = require('expo-speech-recognition');
 
-  const [listening, setListening] = useState(false);
-  const [transcript, setTranscript] = useState('');
-
-  useSpeechRecognitionEvent('start', () => {
-    setListening(true);
-    onListening(true);
-  });
-  useSpeechRecognitionEvent('end', () => {
-    setListening(false);
-    onListening(false);
-  });
-  useSpeechRecognitionEvent('error', () => {
-    setListening(false);
-    onListening(false);
-  });
+  useSpeechRecognitionEvent('start', () => onListening(true));
+  useSpeechRecognitionEvent('end', () => onListening(false));
+  useSpeechRecognitionEvent('error', () => onListening(false));
   useSpeechRecognitionEvent('result', (event) => {
     const text = event.results[0]?.transcript ?? '';
-    setTranscript(text);
-    onTranscript(text);
     if (event.isFinal && text) {
-      onResult(parseVoiceNote(text, allChips));
+      onResult(text);
     }
   });
 
   useEffect(() => {
+    controlRef.current = {
+      start: async () => {
+        const { granted } = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+        if (!granted) {
+          Alert.alert('Microphone Permission', 'Voice input requires microphone access.');
+          return;
+        }
+        ExpoSpeechRecognitionModule.start({ lang: 'en-US', interimResults: true, continuous: false });
+      },
+      stop: () => ExpoSpeechRecognitionModule.stop(),
+    };
     return () => {
       ExpoSpeechRecognitionModule.abort();
-      onCleanup();
     };
   }, []);
 
-  async function startListening() {
-    setTranscript('');
-    onTranscript('');
-    ExpoSpeechRecognitionModule.start({ lang: 'en-US', interimResults: true, continuous: false });
-  }
-
-  function stopListening() {
-    ExpoSpeechRecognitionModule.stop();
-  }
-
-  return (
-    <View style={styles.voiceRow}>
-      <TouchableOpacity
-        style={[styles.micBtn, listening && styles.micBtnActive]}
-        onPress={listening ? stopListening : startListening}
-      >
-        <Text style={styles.micIcon}>{listening ? '■' : '🎤'}</Text>
-        <Text style={styles.micLabel}>{listening ? 'Listening…' : 'Speak'}</Text>
-      </TouchableOpacity>
-      {transcript ? (
-        <Text style={styles.transcript} numberOfLines={1}>
-          {transcript}
-        </Text>
-      ) : null}
-    </View>
-  );
+  return null;
 }
 
 // ── Main screen ───────────────────────────────────────────────────────────────
@@ -142,24 +122,16 @@ export default function DriveScreen({ navigation, route }) {
   const [allChips, setAllChips] = useState({});
   const [angleMap, setAngleMap] = useState({});
   const [notes, setNotes] = useState([]);
-  const [current, setCurrent] = useState({ ...EMPTY_NOTE });
 
-  const [tiltLocked, setTiltLocked] = useState(false);
-  const [voiceNoteReady, setVoiceNoteReady] = useState(false);
+  const [autoOdo, setAutoOdo] = useState(true);
+  const [listening, setListening] = useState(false);
   const [deadZone, setDeadZone] = useState(3);
   const { angleDeg, direction, ready: tiltReady } = useDeviceTilt(deadZone);
+  const { lapM } = useGpsOdo();
   const historyRef = useRef(null);
-
-  // Auto-fill direction + severity from tilt when not locked by voice input
-  useEffect(() => {
-    if (tiltLocked) return;
-    const detSev = detectSeverity(angleDeg, angleMap);
-    setCurrent((prev) => ({
-      ...prev,
-      direction: direction ?? prev.direction,
-      severity: detSev ?? prev.severity,
-    }));
-  }, [angleDeg, direction, angleMap, tiltLocked]);
+  const voiceRef = useRef(null);
+  const voiceModeRef = useRef('structured'); // 'structured' | 'freeform'
+  const [current, setCurrent] = useState({ ...EMPTY_NOTE });
 
   useFocusEffect(
     useCallback(() => {
@@ -174,8 +146,6 @@ export default function DriveScreen({ navigation, route }) {
     const chips = await getAllChips(rallyId);
     setAllChips(chips);
 
-    // Build angle map directly from this rally's severity chips (angle stored per-chip).
-    // Chips with angle == null are not shown on the dial.
     const map = {};
     for (const chip of chips.severity ?? []) {
       if (chip.angle != null) map[chip.value] = chip.angle;
@@ -186,57 +156,105 @@ export default function DriveScreen({ navigation, route }) {
     const rows = await getPaceNotes(setId);
     setNotes(rows.map(parseNote));
     setCurrent({ ...EMPTY_NOTE });
-    setTiltLocked(false);
-    setVoiceNoteReady(false);
   }
 
-  function handleVoiceResult(parsed) {
-    if (parsed.direction != null || parsed.severity != null) setTiltLocked(true);
-    setCurrent((prev) => mergeVoiceResult(prev, parsed));
-    setVoiceNoteReady(true);
-  }
+  // ── Save helper ──────────────────────────────────────────────────────────────
 
-  async function saveNote() {
-    if (!current.direction && !current.severity && !current.notes) return;
+  async function saveNote(note) {
+    if (!note.direction && !note.severity && !note.notes) return;
     const seq = await getNextSeq(setId);
     await upsertPaceNote({
       set_id: setId,
       seq,
-      ...current,
-      index_odo: null,
+      ...note,
+      index_odo: autoOdo ? Math.round(lapM) : null,
       recce_at: new Date().toISOString(),
     });
+  }
+
+  async function refreshAndScroll() {
     const rows = await getPaceNotes(setId);
     setNotes(rows.map(parseNote));
-    setCurrent({ ...EMPTY_NOTE });
-    setTiltLocked(false);
-    setVoiceNoteReady(false);
-    setTimeout(() => historyRef.current?.scrollToEnd({ animated: true }), 50);
+    setTimeout(() => historyRef.current?.scrollToOffset({ offset: 0, animated: true }), 50);
   }
 
-  function clearNote() {
-    setCurrent({ ...EMPTY_NOTE });
-    setTiltLocked(false);
-    setVoiceNoteReady(false);
+  // ── Voice result handling ────────────────────────────────────────────────────
+
+  function handleVoiceResult(transcript) {
+    if (voiceModeRef.current === 'freeform') {
+      handleFreeformResult(transcript);
+    } else {
+      handleStructuredResult(transcript);
+    }
   }
 
-  function deleteNote(note) {
-    Alert.alert('Delete note?', renderNote(note, displayOrder), [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          await deletePaceNote(setId, note.seq);
-          const rows = await getPaceNotes(setId);
-          setNotes(rows.map(parseNote));
-        },
-      },
-    ]);
+  async function handleStructuredResult(transcript) {
+    const parsed = parseMultiNote(transcript, allChips);
+    if (parsed.length === 0) return;
+
+    // Build caution value set for detecting caution triggers
+    const cautionValues = new Set(
+      (allChips.caution_decorator ?? []).map((c) => c.value),
+    );
+
+    let cur = { ...current };
+
+    for (const note of parsed) {
+      const startsNew =
+        !!note.direction || note.decorators?.some((d) => cautionValues.has(d));
+
+      if (startsNew && (cur.direction || cur.severity || cur.decorators?.length)) {
+        await saveNote(cur);
+        cur = { ...EMPTY_NOTE };
+      }
+
+      cur = mergeVoiceResult(cur, note);
+
+      // Joiners like > / < (opens/tightens) immediately complete the note.
+      // The following note only needs a severity (direction exempt).
+      if (cur.joiner && SAVE_JOINERS.test(cur.joiner)) {
+        await saveNote(cur);
+        cur = { ...EMPTY_NOTE };
+      }
+    }
+
+    setCurrent(cur);
+    await refreshAndScroll();
   }
 
-  const preview = renderNote(current, displayOrder);
+  async function handleFreeformResult(transcript) {
+    if (!transcript.trim()) return;
+    await saveNote({ ...EMPTY_NOTE, notes: transcript.trim() });
+    await refreshAndScroll();
+  }
+
+  // ── Voice button handlers ────────────────────────────────────────────────────
+
+  function startStructured() {
+    voiceModeRef.current = 'structured';
+    voiceRef.current?.start();
+  }
+
+  function startFreeform() {
+    voiceModeRef.current = 'freeform';
+    voiceRef.current?.start();
+  }
+
+  function stopVoice() {
+    voiceRef.current?.stop();
+  }
+
+  // ── Delete ───────────────────────────────────────────────────────────────────
+
+  async function quickDelete(note) {
+    await deletePaceNote(setId, note.seq);
+    const rows = await getPaceNotes(setId);
+    setNotes(rows.map(parseNote));
+  }
+
   const detectedSev = detectSeverity(angleDeg, angleMap);
+  const currentPreview = renderNote(current, displayOrder);
+  const hasCurrentContent = !!(current.direction || current.severity || current.notes || current.decorators?.length);
 
   return (
     <View style={styles.container}>
@@ -261,13 +279,29 @@ export default function DriveScreen({ navigation, route }) {
 
       {/* Voice input — only mounted when native module is present */}
       {SPEECH_AVAILABLE ? (
-        <VoiceSection
-          allChips={allChips}
-          onResult={handleVoiceResult}
-          onTranscript={() => {}}
-          onListening={() => {}}
-          onCleanup={() => {}}
-        />
+        <>
+          <VoiceEngine
+            controlRef={voiceRef}
+            onResult={handleVoiceResult}
+            onListening={setListening}
+          />
+          <View style={styles.voiceRow}>
+            <TouchableOpacity
+              style={[styles.freeformBtn, listening && voiceModeRef.current === 'freeform' && styles.micBtnActive]}
+              onPress={listening ? stopVoice : startFreeform}
+            >
+              <Text style={styles.micIcon}>📝</Text>
+              <Text style={styles.micLabel}>Free</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.micBtn, listening && voiceModeRef.current === 'structured' && styles.micBtnActive]}
+              onPress={listening ? stopVoice : startStructured}
+            >
+              <Text style={styles.micIcon}>{listening ? '■' : '🎤'}</Text>
+              <Text style={styles.micLabel}>{listening ? 'Listening…' : 'Speak'}</Text>
+            </TouchableOpacity>
+          </View>
+        </>
       ) : (
         <View style={styles.voiceRow}>
           <View style={styles.speechUnavail}>
@@ -277,44 +311,60 @@ export default function DriveScreen({ navigation, route }) {
         </View>
       )}
 
-      {voiceNoteReady && preview ? (
-        <View style={styles.previewRow}>
-          <Text style={styles.previewText} numberOfLines={2}>
-            {preview}
-          </Text>
-        </View>
-      ) : null}
-
       {/* Actions */}
       <View style={styles.actionRow}>
-        <TouchableOpacity style={styles.clearBtn} onPress={clearNote}>
-          <Text style={styles.clearBtnText}>Clear</Text>
-        </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.confirmBtn, !voiceNoteReady && styles.confirmBtnDisabled]}
-          onPress={saveNote}
-          disabled={!voiceNoteReady}
+          style={[styles.autoOdoBtn, autoOdo && styles.autoOdoBtnActive]}
+          onPress={() => setAutoOdo((v) => !v)}
         >
-          <Text style={styles.confirmBtnText}>Confirm</Text>
+          <Text style={[styles.autoOdoText, autoOdo && styles.autoOdoTextActive]}>
+            ODO {autoOdo ? '✓' : '✗'}
+          </Text>
         </TouchableOpacity>
       </View>
 
+      {/* In-progress note */}
+      {hasCurrentContent ? (
+        <View style={[styles.historyItem, styles.historyItemCurrent]}>
+          <Text style={[styles.historyOdo, styles.historyOdoLatest]} />
+          <Text style={[styles.historyNote, styles.historyNoteCurrent]} numberOfLines={2}>
+            {currentPreview || '…'}
+          </Text>
+          <TouchableOpacity style={styles.deleteBtn} onPress={() => setCurrent({ ...EMPTY_NOTE })}>
+            <Text style={styles.deleteIcon}>✕</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
       <FlatList
         ref={historyRef}
-        data={notes}
+        data={[...notes].reverse()}
         keyExtractor={(n) => String(n.seq)}
         style={styles.history}
-        ListEmptyComponent={<Text style={styles.historyEmpty}>No notes yet</Text>}
-        renderItem={({ item }) => (
-          <TouchableOpacity style={styles.historyItem} onLongPress={() => deleteNote(item)}>
-            <Text style={styles.historyOdo}>
-              {item.index_odo != null ? `${item.index_odo} m` : ''}
-            </Text>
-            <Text style={styles.historyNote} numberOfLines={1}>
-              {renderNote(item, displayOrder)}
-            </Text>
-          </TouchableOpacity>
-        )}
+        ListEmptyComponent={
+          !hasCurrentContent ? <Text style={styles.historyEmpty}>No notes yet</Text> : null
+        }
+        renderItem={({ item, index }) => {
+          const isLatest = index === 0;
+          return (
+            <View style={[styles.historyItem, isLatest && styles.historyItemLatest]}>
+              <Text style={[styles.historyOdo, isLatest && styles.historyOdoLatest]}>
+                {item.index_odo != null ? `${item.index_odo} m` : ''}
+              </Text>
+              <Text
+                style={[styles.historyNote, isLatest && styles.historyNoteLatest]}
+                numberOfLines={isLatest ? 2 : 1}
+              >
+                {renderNote(item, displayOrder)}
+              </Text>
+              {isLatest ? (
+                <TouchableOpacity style={styles.deleteBtn} onPress={() => quickDelete(item)}>
+                  <Text style={styles.deleteIcon}>✕</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          );
+        }}
       />
     </View>
   );
@@ -338,23 +388,28 @@ const styles = StyleSheet.create({
   headerTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
   tiltStatus: { color: '#555', fontSize: 11 },
 
-  previewRow: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: '#0d0d0d',
-    borderBottomWidth: 1,
-    borderBottomColor: '#1a1a1a',
-    minHeight: 54,
-  },
-  previewText: { color: '#fff', fontSize: 22, fontWeight: '700', letterSpacing: 0.5 },
-
   voiceRow: {
+    flexDirection: 'row',
+    gap: 10,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#1a1a1a',
+  },
+  freeformBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 14,
+    borderRadius: 8,
+    backgroundColor: '#111',
+    borderWidth: 1,
+    borderColor: '#333',
   },
   micBtn: {
+    flex: 2,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -368,9 +423,8 @@ const styles = StyleSheet.create({
   micBtnActive: { borderColor: ACCENT, backgroundColor: 'rgba(0,188,212,0.12)' },
   micIcon: { fontSize: 20 },
   micLabel: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  transcript: { color: '#555', fontSize: 12, marginTop: 4, fontStyle: 'italic' },
 
-  speechUnavail: { alignItems: 'center', paddingVertical: 10 },
+  speechUnavail: { flex: 1, alignItems: 'center', paddingVertical: 10 },
   speechUnavailText: { color: '#444', fontSize: 14 },
   speechUnavailSub: { color: '#333', fontSize: 11, marginTop: 2 },
 
@@ -383,25 +437,17 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#1a1a1a',
   },
-  clearBtn: {
-    flex: 1,
+  autoOdoBtn: {
     paddingVertical: 12,
+    paddingHorizontal: 14,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#333',
     alignItems: 'center',
   },
-  clearBtnText: { color: '#888', fontSize: 14, fontWeight: '600' },
-  confirmBtn: {
-    flex: 2,
-    paddingVertical: 12,
-    borderRadius: 8,
-    backgroundColor: ACCENT,
-    alignItems: 'center',
-  },
-  confirmBtnDisabled: { backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: '#333' },
-  confirmBtnText: { color: '#000', fontSize: 15, fontWeight: '800' },
-
+  autoOdoBtnActive: { borderColor: ACCENT },
+  autoOdoText: { color: '#555', fontSize: 12, fontWeight: '600' },
+  autoOdoTextActive: { color: ACCENT },
   history: { flex: 1 },
   historyEmpty: { color: '#333', textAlign: 'center', marginTop: 24, fontSize: 13 },
   historyItem: {
@@ -413,6 +459,26 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#111',
   },
+  historyItemCurrent: {
+    backgroundColor: '#0d0d0d',
+    paddingVertical: 14,
+    borderBottomWidth: 2,
+    borderBottomColor: '#ff9800',
+  },
+  historyNoteCurrent: { color: '#ff9800', fontSize: 20, fontWeight: '700' },
+  historyItemLatest: {
+    backgroundColor: '#0d0d0d',
+    paddingVertical: 14,
+    borderBottomWidth: 2,
+    borderBottomColor: ACCENT,
+  },
   historyOdo: { color: '#555', fontSize: 12, width: 56 },
+  historyOdoLatest: { fontSize: 14, color: '#888' },
   historyNote: { color: '#ccc', fontSize: 14, flex: 1 },
+  historyNoteLatest: { color: '#fff', fontSize: 20, fontWeight: '700' },
+  deleteBtn: {
+    padding: 8,
+    marginLeft: 4,
+  },
+  deleteIcon: { color: '#666', fontSize: 16 },
 });

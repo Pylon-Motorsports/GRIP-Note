@@ -76,9 +76,9 @@ describe('seedDefaultChips', () => {
     await seedDefaultChips(RALLY_ID);
     const severity = await getChips(RALLY_ID, 'severity');
     const sev3 = severity.find((c) => c.value === '3');
-    expect(sev3.angle).toBe(60);
-    const sev9 = severity.find((c) => c.value === '9');
-    expect(sev9.angle).toBe(5);
+    expect(sev3.angle).toBe(63);
+    const sev6 = severity.find((c) => c.value === '6');
+    expect(sev6.angle).toBe(8);
     // Hairpin has no angle
     const hairpin = severity.find((c) => c.value === 'Hairpin');
     expect(hairpin.angle).toBeNull();

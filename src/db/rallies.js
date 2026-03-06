@@ -3,7 +3,7 @@
  * CRUD for rallies, stages, and note_sets.
  * Hierarchy: rallies → stages → note_sets → pace_notes.
  */
-import { getDb } from './database';
+import { getDb, getSetting } from './database';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 import { seedDefaultChips, copyChips } from './rallyChips';
@@ -86,9 +86,12 @@ export async function getRallyPrefsForSet(setId) {
   `,
     [setId],
   );
+  // Global app_settings are the source of truth; per-rally columns are unused for now.
+  const globalOrder = await getSetting('display_order');
+  const globalUnit = await getSetting('odo_unit');
   return {
-    displayOrder: row?.display_order ?? 'direction_first',
-    odoUnit: row?.odo_unit ?? 'metres',
+    displayOrder: globalOrder ?? row?.display_order ?? 'direction_first',
+    odoUnit: globalUnit ?? row?.odo_unit ?? 'metres',
   };
 }
 
