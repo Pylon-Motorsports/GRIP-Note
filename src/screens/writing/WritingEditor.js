@@ -601,7 +601,7 @@ const styles = StyleSheet.create({
   },
   historyItemActive: { backgroundColor: '#1a1a1a' },
   historyOdo: { color: '#555', fontSize: 11, minWidth: 48 },
-  historyNote: { color: '#ccc', fontSize: 14, flex: 1 },
+  historyNote: { color: '#ccc', fontSize: 14, flex: 1, fontFamily: 'monospace', fontWeight: 'bold' },
 
   newNoteFooter: {
     paddingVertical: 10,
@@ -626,7 +626,7 @@ const styles = StyleSheet.create({
   },
   editingLabel: { color: '#555', fontSize: 11, fontWeight: '600', letterSpacing: 1 },
   editingNewBtn: { color: '#e63946', fontSize: 12, fontWeight: '700' },
-  previewText: { color: '#fff', fontSize: 22, fontWeight: '700', letterSpacing: 1 },
+  previewText: { color: '#fff', fontSize: 22, fontWeight: '700', letterSpacing: 1, fontFamily: 'monospace' },
 
   panel: { flex: 1, padding: 12 },
 

@@ -282,10 +282,10 @@ const styles = StyleSheet.create({
   noteRowWrap: { gap: 1 },
   noteRowOdo: { fontSize: 11, textAlign: 'center', letterSpacing: 0.3 },
 
-  notePrev4: { fontSize: 12, textAlign: 'center' },
-  notePrev3: { fontSize: 15, textAlign: 'center' },
-  notePrev2: { fontSize: 19, textAlign: 'center' },
-  notePrev1: { fontSize: 24, fontWeight: '600', textAlign: 'center' },
+  notePrev4: { fontSize: 12, textAlign: 'center', fontFamily: 'monospace', fontWeight: 'bold' },
+  notePrev3: { fontSize: 15, textAlign: 'center', fontFamily: 'monospace', fontWeight: 'bold' },
+  notePrev2: { fontSize: 19, textAlign: 'center', fontFamily: 'monospace', fontWeight: 'bold' },
+  notePrev1: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', fontFamily: 'monospace' },
 
   divider: { height: 1, marginVertical: 2 },
 
@@ -295,12 +295,13 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     textAlign: 'center',
     letterSpacing: 1,
+    fontFamily: 'monospace',
   },
 
-  noteNext1: { fontSize: 32, fontWeight: '700', textAlign: 'center', letterSpacing: 0.5 },
-  noteNext2: { fontSize: 24, fontWeight: '600', textAlign: 'center' },
-  noteNext3: { fontSize: 19, textAlign: 'center' },
-  noteNext4: { fontSize: 15, textAlign: 'center' },
+  noteNext1: { fontSize: 32, fontWeight: '700', textAlign: 'center', letterSpacing: 0.5, fontFamily: 'monospace' },
+  noteNext2: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', fontFamily: 'monospace' },
+  noteNext3: { fontSize: 19, textAlign: 'center', fontFamily: 'monospace', fontWeight: 'bold' },
+  noteNext4: { fontSize: 15, textAlign: 'center', fontFamily: 'monospace', fontWeight: 'bold' },
 
   bottomBar: {
     flexDirection: 'row',

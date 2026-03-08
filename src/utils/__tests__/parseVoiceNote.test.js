@@ -139,8 +139,6 @@ describe('mergeVoiceResult', () => {
 
 // ── Note accumulation (simulates DriveScreen handleStructuredResult) ──────────
 
-const SAVE_JOINERS = /^[><]$|opens|tightens/i;
-
 const DRIVE_CHIPS = {
   ...CHIPS,
   joiner: [
@@ -165,7 +163,7 @@ const EMPTY_NOTE = {
 
 /**
  * Simulates DriveScreen's handleStructuredResult logic:
- * accumulates voice inputs, saves on new direction/caution or SAVE_JOINERS.
+ * accumulates voice inputs, saves when a new direction or caution is spoken.
  */
 function simulateAccumulation(transcripts, chips = DRIVE_CHIPS) {
   const saved = [];
@@ -187,11 +185,6 @@ function simulateAccumulation(transcripts, chips = DRIVE_CHIPS) {
       }
 
       cur = mergeVoiceResult(cur, note);
-
-      if (cur.joiner && SAVE_JOINERS.test(cur.joiner)) {
-        saved.push({ ...cur });
-        cur = { ...EMPTY_NOTE };
-      }
     }
   }
 
@@ -267,76 +260,30 @@ describe('regular note accumulation', () => {
   });
 });
 
-describe('opens/tightens (SAVE_JOINERS)', () => {
-  it('opens immediately saves the current note', () => {
+describe('opens/tightens (regular joiners)', () => {
+  it('opens accumulates as a normal joiner', () => {
     const { saved, current } = simulateAccumulation(['right five opens']);
 
-    expect(saved).toHaveLength(1);
-    expect(saved[0].direction).toBe('R');
-    expect(saved[0].severity).toBe('5');
-    expect(saved[0].joiner).toBe('>');
-
-    // Current is empty — ready for severity-only follow-up
-    expect(current.direction).toBeNull();
-    expect(current.severity).toBeNull();
+    // Not saved — still accumulating
+    expect(saved).toHaveLength(0);
+    expect(current.direction).toBe('R');
+    expect(current.severity).toBe('5');
+    expect(current.joiner).toBe('>');
   });
 
-  it('tightens immediately saves the current note', () => {
+  it('tightens accumulates as a normal joiner', () => {
     const { saved, current } = simulateAccumulation(['left three tightens']);
 
-    expect(saved).toHaveLength(1);
-    expect(saved[0].direction).toBe('L');
-    expect(saved[0].severity).toBe('3');
-    expect(saved[0].joiner).toBe('<');
-
-    expect(current.direction).toBeNull();
-  });
-
-  it('following note after opens only needs severity', () => {
-    const { saved, current } = simulateAccumulation([
-      'right five opens',
-      'three',  // severity only — no direction needed
-    ]);
-
-    expect(saved).toHaveLength(1);
-    expect(saved[0].direction).toBe('R');
-    expect(saved[0].severity).toBe('5');
-    expect(saved[0].joiner).toBe('>');
-
-    // Second note accumulates with just severity
-    expect(current.direction).toBeNull();
-    expect(current.severity).toBe('3');
-  });
-
-  it('full sequence: R5 opens 3 into L3', () => {
-    const { saved, current } = simulateAccumulation([
-      'right five opens',   // saved immediately
-      'three into',         // accumulates (into is not SAVE_JOINER)
-      'left three',         // triggers save of previous, starts new
-    ]);
-
-    expect(saved).toHaveLength(2);
-
-    // First: R 5 >
-    expect(saved[0].direction).toBe('R');
-    expect(saved[0].severity).toBe('5');
-    expect(saved[0].joiner).toBe('>');
-
-    // Second: (no dir) 3 →
-    expect(saved[1].direction).toBeNull();
-    expect(saved[1].severity).toBe('3');
-    expect(saved[1].joiner).toBe('→');
-
-    // Current: L 3
+    expect(saved).toHaveLength(0);
     expect(current.direction).toBe('L');
     expect(current.severity).toBe('3');
+    expect(current.joiner).toBe('<');
   });
 
-  it('opens + following severity across separate utterances', () => {
-    // In practice, opens and the follow-up severity come from separate voice presses
+  it('new direction after opens saves previous note', () => {
     const { saved, current } = simulateAccumulation([
       'right five opens',
-      'three into',
+      'left three',
     ]);
 
     expect(saved).toHaveLength(1);
@@ -344,9 +291,8 @@ describe('opens/tightens (SAVE_JOINERS)', () => {
     expect(saved[0].severity).toBe('5');
     expect(saved[0].joiner).toBe('>');
 
+    expect(current.direction).toBe('L');
     expect(current.severity).toBe('3');
-    expect(current.joiner).toBe('→');
-    expect(current.direction).toBeNull();
   });
 });
 

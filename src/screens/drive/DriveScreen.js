@@ -1,8 +1,8 @@
 /**
  * @module DriveScreen
  * Drive mode — writes pace notes using voice input with compass dial for reference.
- * Two voice modes: structured (parses chips, accumulates across presses, saves on
- * new direction/caution) and freeform (raw transcript → notes field).
+ * Two voice modes: structured (parses chips, accumulates across presses; a new
+ * direction or caution saves the previous note) and freeform (raw transcript → notes).
  * Route params: { setId, stageId?, rally? }
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -34,9 +34,6 @@ import GpsOdoBar from '../../components/GpsOdoBar';
 import CompassDial from '../../components/CompassDial';
 
 const ACCENT = '#00bcd4';
-
-// Joiners that immediately save the current note (the following note only needs severity).
-const SAVE_JOINERS = /^[><]$|opens|tightens/i;
 
 // Check once at module load — try to import the native module
 let SPEECH_AVAILABLE = false;
@@ -209,13 +206,6 @@ export default function DriveScreen({ navigation, route }) {
       }
 
       cur = mergeVoiceResult(cur, note);
-
-      // Joiners like > / < (opens/tightens) immediately complete the note.
-      // The following note only needs a severity (direction exempt).
-      if (cur.joiner && SAVE_JOINERS.test(cur.joiner)) {
-        await saveNote(cur);
-        cur = { ...EMPTY_NOTE };
-      }
     }
 
     setCurrent(cur);
@@ -469,7 +459,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: '#ff9800',
   },
-  historyNoteCurrent: { color: '#ff9800', fontSize: 20, fontWeight: '700' },
+  historyNoteCurrent: { color: '#ff9800', fontSize: 20, fontWeight: '700', fontFamily: 'monospace' },
   historyItemLatest: {
     backgroundColor: '#0d0d0d',
     paddingVertical: 14,
@@ -478,8 +468,8 @@ const styles = StyleSheet.create({
   },
   historyOdo: { color: '#555', fontSize: 12, width: 56 },
   historyOdoLatest: { fontSize: 14, color: '#888' },
-  historyNote: { color: '#ccc', fontSize: 14, flex: 1 },
-  historyNoteLatest: { color: '#fff', fontSize: 20, fontWeight: '700' },
+  historyNote: { color: '#ccc', fontSize: 14, flex: 1, fontFamily: 'monospace', fontWeight: 'bold' },
+  historyNoteLatest: { color: '#fff', fontSize: 20, fontWeight: '700', fontFamily: 'monospace' },
   deleteBtn: {
     padding: 8,
     marginLeft: 4,
