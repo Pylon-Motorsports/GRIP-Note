@@ -122,6 +122,18 @@ describe('renderNote', () => {
     );
   });
 
+  it('custom cautionSet puts user-added caution before direction', () => {
+    const customCautions = new Set(['!', 'Danger']);
+    expect(
+      renderNote(
+        { direction: 'L', severity: '3', decorators: ['Danger', 'Brow'] },
+        'direction_first',
+        null,
+        customCautions,
+      ),
+    ).toBe('Danger L 3 Brow');
+  });
+
   it('renders full complex note correctly', () => {
     expect(
       renderNote({

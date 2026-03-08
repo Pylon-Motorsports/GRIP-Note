@@ -4,7 +4,7 @@
  * note list with inline editing, and insert-before/after support.
  * Route params: { setId, mode? } — mode='recce' shows a recce banner.
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -267,7 +267,7 @@ export default function WritingEditor({ route, navigation }) {
   }
 
   function noteActions(note) {
-    Alert.alert(`Note #${note.seq}`, renderNote(note, displayOrder) || '—', [
+    Alert.alert(`Note #${note.seq}`, renderNote(note, displayOrder, null, cautionSet) || '—', [
       {
         text: 'Insert Before',
         onPress: () => {
@@ -302,7 +302,11 @@ export default function WritingEditor({ route, navigation }) {
     ]);
   }
 
-  const preview = renderNote(current, displayOrder) || '—';
+  const cautionSet = useMemo(
+    () => new Set(cautionChips.map((c) => c.value)),
+    [cautionChips],
+  );
+  const preview = renderNote(current, displayOrder, null, cautionSet) || '—';
 
   return (
     <SafeAreaView style={styles.root} edges={['bottom']}>
@@ -345,7 +349,7 @@ export default function WritingEditor({ route, navigation }) {
                   {formatOdo(item.index_odo, odoUnit) || `#${item.seq}`}
                 </Text>
                 <Text style={styles.historyNote} numberOfLines={1}>
-                  {renderNote(item, displayOrder)}
+                  {renderNote(item, displayOrder, null, cautionSet)}
                 </Text>
               </TouchableOpacity>
             )}

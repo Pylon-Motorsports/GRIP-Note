@@ -6,6 +6,7 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { getDb } from '../db/database';
+import { getChips } from '../db/rallyChips';
 import { renderNote, formatOdo } from './renderNote';
 
 // A numerical joiner is a distance (10, 20, 30 …) — ends a note group and adds visual gap
@@ -27,6 +28,8 @@ export async function exportRallyPdf(rallyId) {
 
   const displayOrder = rally.display_order ?? 'direction_first';
   const odoUnit = rally.odo_unit ?? 'metres';
+  const cauChips = await getChips(rallyId, 'caution_decorator');
+  const cautionSet = new Set(cauChips.map((c) => c.value));
 
   const stages = await db.getAllAsync(`SELECT * FROM stages WHERE rally_id = ? ORDER BY name ASC`, [
     rallyId,
@@ -116,7 +119,7 @@ function renderPage(rallyName, stageName, entries, pageNum, totalPages, displayO
 
       // Each note in the group is rendered including its (non-numerical) joiner at the end
       const noteText = entry
-        .map((n) => renderNote(n, displayOrder))
+        .map((n) => renderNote(n, displayOrder, null, cautionSet))
         .filter(Boolean)
         .join('  ');
 

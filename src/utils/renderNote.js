@@ -16,14 +16,15 @@
  * @returns {string}
  */
 
-const CAUTION_DECS = new Set(['!', '!!', '!!!', 'care']);
+const DEFAULT_CAUTION_DECS = new Set(['!', '!!', '!!!', 'care']);
 
-export function renderNote(note, displayOrder = 'direction_first', audibleMap = null) {
+export function renderNote(note, displayOrder = 'direction_first', audibleMap = null, cautionSet = null) {
+  const cautions = cautionSet ?? DEFAULT_CAUTION_DECS;
   const toA = (v) => (audibleMap && audibleMap[v] ? audibleMap[v] : v);
 
   const decorators = Array.isArray(note.decorators) ? note.decorators : [];
-  const before = decorators.filter((d) => CAUTION_DECS.has(d.toLowerCase()));
-  const after = decorators.filter((d) => !CAUTION_DECS.has(d.toLowerCase()));
+  const before = decorators.filter((d) => cautions.has(d) || cautions.has(d.toLowerCase()));
+  const after = decorators.filter((d) => !cautions.has(d) && !cautions.has(d.toLowerCase()));
 
   const parts = [];
 
@@ -55,8 +56,8 @@ export function renderNote(note, displayOrder = 'direction_first', audibleMap = 
 
   // 7. Joiner decorators: cautions first, then others
   const joinerDecs = Array.isArray(note.joiner_decorators) ? note.joiner_decorators : [];
-  const joinerBefore = joinerDecs.filter((d) => CAUTION_DECS.has(d.toLowerCase()));
-  const joinerAfter = joinerDecs.filter((d) => !CAUTION_DECS.has(d.toLowerCase()));
+  const joinerBefore = joinerDecs.filter((d) => cautions.has(d) || cautions.has(d.toLowerCase()));
+  const joinerAfter = joinerDecs.filter((d) => !cautions.has(d) && !cautions.has(d.toLowerCase()));
   joinerBefore.forEach((d) => parts.push(toA(d)));
   joinerAfter.forEach((d) => parts.push(toA(d)));
 

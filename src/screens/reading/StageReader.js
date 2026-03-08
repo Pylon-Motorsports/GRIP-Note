@@ -18,7 +18,7 @@ import * as Speech from 'expo-speech';
 import { useFocusEffect } from '@react-navigation/native';
 import { getPaceNotes, parseNote } from '../../db/paceNotes';
 import { getRallyPrefsForSet, getRallyIdForSet } from '../../db/rallies';
-import { getAudibleMap } from '../../db/rallyChips';
+import { getAudibleMap, getChips } from '../../db/rallyChips';
 import { renderNote, formatOdo } from '../../utils/renderNote';
 import GpsOdoBar from '../../components/GpsOdoBar';
 
@@ -34,6 +34,7 @@ export default function StageReader({ route }) {
   const [nightMode, setNightMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [audibleMap, setAudibleMap] = useState({});
+  const [cautionSet, setCautionSet] = useState(null);
   const ttsRef = useRef(false);
 
   // All displayable notes: START + real notes
@@ -63,7 +64,11 @@ export default function StageReader({ route }) {
     setOdoUnit(prefs.odoUnit);
     setNotes(rows.map(parseNote));
     setIndex(0);
-    if (rallyId) setAudibleMap(await getAudibleMap(rallyId));
+    if (rallyId) {
+      setAudibleMap(await getAudibleMap(rallyId));
+      const cau = await getChips(rallyId, 'caution_decorator');
+      setCautionSet(new Set(cau.map((c) => c.value)));
+    }
     setLoading(false);
   }
 
@@ -74,7 +79,7 @@ export default function StageReader({ route }) {
       Speech.speak('Go', { language: 'en', rate: 0.85, pitch: 1.0 });
       return;
     }
-    const text = renderNote(note, displayOrder, audibleMap);
+    const text = renderNote(note, displayOrder, audibleMap, cautionSet);
     if (text) Speech.speak(text, { language: 'en', rate: 0.85, pitch: 1.0 });
   }
 
@@ -114,7 +119,7 @@ export default function StageReader({ route }) {
 
   function currText(note) {
     if (note._start) return 'START';
-    return renderNote(note, displayOrder);
+    return renderNote(note, displayOrder, null, cautionSet);
   }
 
   if (loading) {

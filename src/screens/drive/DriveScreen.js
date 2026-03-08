@@ -5,7 +5,7 @@
  * new direction/caution) and freeform (raw transcript → notes field).
  * Route params: { setId, stageId?, rally? }
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -252,8 +252,12 @@ export default function DriveScreen({ navigation, route }) {
     setNotes(rows.map(parseNote));
   }
 
+  const cautionSet = useMemo(
+    () => new Set((allChips.caution_decorator ?? []).map((c) => c.value)),
+    [allChips],
+  );
   const detectedSev = detectSeverity(angleDeg, angleMap);
-  const currentPreview = renderNote(current, displayOrder);
+  const currentPreview = renderNote(current, displayOrder, null, cautionSet);
   const hasCurrentContent = !!(current.direction || current.severity || current.notes || current.decorators?.length);
 
   return (
@@ -355,7 +359,7 @@ export default function DriveScreen({ navigation, route }) {
                 style={[styles.historyNote, isLatest && styles.historyNoteLatest]}
                 numberOfLines={isLatest ? 2 : 1}
               >
-                {renderNote(item, displayOrder)}
+                {renderNote(item, displayOrder, null, cautionSet)}
               </Text>
               {isLatest ? (
                 <TouchableOpacity style={styles.deleteBtn} onPress={() => quickDelete(item)}>
