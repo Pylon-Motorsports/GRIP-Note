@@ -27,11 +27,6 @@ export async function exportRallyPdf(rallyId) {
 
   const displayOrder = rally.display_order ?? 'direction_first';
   const odoUnit = rally.odo_unit ?? 'metres';
-  const cauRows = await db.getAllAsync(
-    `SELECT value FROM rally_chips WHERE rally_id = ? AND category = 'caution_decorator'`,
-    [rallyId],
-  );
-  const cautionSet = new Set(cauRows.map((r) => r.value));
 
   const stages = await db.getAllAsync(`SELECT * FROM stages WHERE rally_id = ? ORDER BY name ASC`, [
     rallyId,
@@ -121,7 +116,7 @@ function renderPage(rallyName, stageName, entries, pageNum, totalPages, displayO
 
       // Each note in the group is rendered including its (non-numerical) joiner at the end
       const noteText = entry
-        .map((n) => renderNote(n, displayOrder, null, cautionSet))
+        .map((n) => renderNote(n, displayOrder))
         .filter(Boolean)
         .join('  ');
 
