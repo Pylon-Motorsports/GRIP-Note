@@ -177,7 +177,7 @@ body { font-family: Helvetica, Arial, sans-serif; background: white; }
 .content {
   position: absolute;
   left: 50%; top: 0; right: 0; bottom: 0;
-  padding: 8mm 12mm 8mm 10mm;
+  padding: 8mm 22mm 8mm 10mm;
   display: flex;
   flex-direction: column;
 }
