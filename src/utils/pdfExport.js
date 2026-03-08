@@ -12,7 +12,7 @@ import { renderNote, formatOdo } from './renderNote';
 const isNumJoiner = (joiner) => joiner && /^\d+$/.test(joiner);
 
 // Conservative entries per page; notes that wrap to 2 lines won't overflow but may leave blank space
-const ENTRIES_PER_PAGE = 9;
+const ENTRIES_PER_PAGE = 8;
 
 /**
  * Exports all stages of a rally as a landscape A4 PDF pacenote booklet.
@@ -177,7 +177,7 @@ body { font-family: Helvetica, Arial, sans-serif; background: white; }
 .content {
   position: absolute;
   left: 50%; top: 0; right: 0; bottom: 0;
-  padding: 8mm 22mm 8mm 10mm;
+  padding: 8mm 22mm 12mm 10mm;
   display: flex;
   flex-direction: column;
 }
