@@ -70,7 +70,6 @@ export default function WritingEditor({ route, navigation }) {
   const [odoUnit, setOdoUnit] = useState('metres');
   const [odoInput, setOdoInput] = useState('');
   const listRef = useRef(null);
-  const prevNoteCount = useRef(0);
   const dirScrollRef = useRef(null);
   const cautionScrollRef = useRef(null);
   const sevScrollRef = useRef(null);
@@ -335,12 +334,7 @@ export default function WritingEditor({ route, navigation }) {
             data={notes}
             keyExtractor={(n) => String(n.seq)}
             style={styles.historyList}
-            onContentSizeChange={() => {
-              if (notes.length > prevNoteCount.current) {
-                listRef.current?.scrollToEnd({ animated: false });
-              }
-              prevNoteCount.current = notes.length;
-            }}
+            maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
             ListEmptyComponent={
               <Text style={styles.historyEmpty}>No notes yet — start below.</Text>
             }
