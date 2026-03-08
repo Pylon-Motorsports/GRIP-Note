@@ -303,7 +303,7 @@ export default function WritingEditor({ route, navigation }) {
           ]),
       },
       { text: 'Cancel', style: 'cancel' },
-    ]);
+    ], { cancelable: true });
   }
 
   const cautionSet = useMemo(
