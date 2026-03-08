@@ -168,17 +168,88 @@ export async function updateChipAudible(id, audible) {
 }
 
 /**
- * Updates both value and audible for a chip.
- * Does not cascade to pace_notes — existing notes keep their stored value strings.
+ * Updates both value and audible for a chip, cascading the rename to all
+ * pace_notes in the same rally so existing notes reflect the new label.
  */
 export async function updateChip(id, value, audible) {
   const db = await getDb();
   if (!value) return;
+
+  // Look up old value, category, and rally_id before updating
+  const chip = await db.getFirstAsync(
+    `SELECT value, category, rally_id FROM rally_chips WHERE id = ?`,
+    [id],
+  );
+  if (!chip) return;
+
   await db.runAsync(`UPDATE rally_chips SET value = ?, audible = ? WHERE id = ?`, [
     value,
     audible || null,
     id,
   ]);
+
+  // Cascade rename to pace_notes if the value actually changed
+  if (chip.value !== value) {
+    await cascadeChipRename(db, chip.rally_id, chip.category, chip.value, value);
+  }
+}
+
+/** Renames a chip value across all pace_notes belonging to the same rally. */
+async function cascadeChipRename(db, rallyId, category, oldVal, newVal) {
+  // Find all set_ids belonging to this rally
+  const setRows = await db.getAllAsync(
+    `SELECT ns.set_id FROM note_sets ns
+     JOIN stages s ON ns.stage_id = s.id
+     WHERE s.rally_id = ?`,
+    [rallyId],
+  );
+  if (setRows.length === 0) return;
+  const setIds = setRows.map((r) => r.set_id);
+  const placeholders = setIds.map(() => '?').join(',');
+
+  // Single-select columns: direct string match
+  const SINGLE_MAP = {
+    direction: 'direction',
+    severity: 'severity',
+    duration: 'duration',
+    joiner: 'joiner',
+  };
+
+  // JSON array columns: decorator categories
+  const JSON_MAP = {
+    decorator: 'decorators',
+    caution_decorator: 'decorators',
+    joiner_decorator: 'joiner_decorators',
+  };
+
+  const singleCol = SINGLE_MAP[category];
+  if (singleCol) {
+    await db.runAsync(
+      `UPDATE pace_notes SET ${singleCol} = ? WHERE set_id IN (${placeholders}) AND ${singleCol} = ?`,
+      [newVal, ...setIds, oldVal],
+    );
+    return;
+  }
+
+  const jsonCol = JSON_MAP[category];
+  if (jsonCol) {
+    // Fetch notes that contain the old value in the JSON array
+    const notes = await db.getAllAsync(
+      `SELECT set_id, seq, ${jsonCol} FROM pace_notes
+       WHERE set_id IN (${placeholders}) AND ${jsonCol} LIKE ?`,
+      [...setIds, `%${oldVal.replace(/[%_]/g, '\\$&')}%`],
+    );
+    for (const note of notes) {
+      const arr = note[jsonCol] ? JSON.parse(note[jsonCol]) : [];
+      const updated = arr.map((v) => (v === oldVal ? newVal : v));
+      if (JSON.stringify(arr) !== JSON.stringify(updated)) {
+        await db.runAsync(
+          `UPDATE pace_notes SET ${jsonCol} = ? WHERE set_id = ? AND seq = ?`,
+          [JSON.stringify(updated), note.set_id, note.seq],
+        );
+      }
+    }
+  }
 }
 
 /**
