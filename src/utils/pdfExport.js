@@ -28,6 +28,12 @@ export async function exportRallyPdf(rallyId) {
   const displayOrder = rally.display_order ?? 'direction_first';
   const odoUnit = rally.odo_unit ?? 'metres';
 
+  const cauRows = await db.getAllAsync(
+    `SELECT value FROM rally_chips WHERE rally_id = ? AND category = 'caution_decorator'`,
+    [rallyId],
+  );
+  const cautionSet = cauRows.length > 0 ? new Set(cauRows.map((r) => r.value)) : null;
+
   const stages = await db.getAllAsync(`SELECT * FROM stages WHERE rally_id = ? ORDER BY name ASC`, [
     rallyId,
   ]);
@@ -71,7 +77,7 @@ export async function exportRallyPdf(rallyId) {
     for (let p = 0; p < totalPages; p++) {
       const pageEntries = entries.slice(p * ENTRIES_PER_PAGE, (p + 1) * ENTRIES_PER_PAGE);
       pageHtmlParts.push(
-        renderPage(rally.name, stage.name, pageEntries, p + 1, totalPages, displayOrder, odoUnit),
+        renderPage(rally.name, stage.name, pageEntries, p + 1, totalPages, displayOrder, odoUnit, cautionSet),
       );
     }
   }
@@ -106,7 +112,7 @@ export async function exportRallyPdf(rallyId) {
  * @param {import('../types').OdoUnit} odoUnit
  * @returns {string} HTML string for the page
  */
-function renderPage(rallyName, stageName, entries, pageNum, totalPages, displayOrder, odoUnit) {
+function renderPage(rallyName, stageName, entries, pageNum, totalPages, displayOrder, odoUnit, cautionSet) {
   const entriesHtml = entries
     .map((entry) => {
       const first = entry[0];
@@ -116,7 +122,7 @@ function renderPage(rallyName, stageName, entries, pageNum, totalPages, displayO
 
       // Each note in the group is rendered including its (non-numerical) joiner at the end
       const noteText = entry
-        .map((n) => renderNote(n, displayOrder))
+        .map((n) => renderNote(n, displayOrder, null, cautionSet))
         .filter(Boolean)
         .join('  ');
 
@@ -206,6 +212,7 @@ body { font-family: Helvetica, Arial, sans-serif; background: white; }
 .note {
   font-size: 24pt;
   font-weight: bold;
+  font-family: 'Courier New', Courier, monospace;
   line-height: 1.1;
   color: #111;
 }

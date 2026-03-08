@@ -660,8 +660,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     backgroundColor: '#111',
   },
-  chipText: { color: '#888', fontSize: 17 },
-  chipTextActive: { color: '#fff', fontWeight: '700' },
+  chipText: { color: '#888', fontSize: 17, fontFamily: 'monospace', fontWeight: 'bold' },
+  chipTextActive: { color: '#fff', fontWeight: '700', fontFamily: 'monospace' },
   chipAdd: {
     borderWidth: 1,
     borderColor: '#333',
