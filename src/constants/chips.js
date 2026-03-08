@@ -29,13 +29,13 @@ export const DEFAULT_CHIP_SEEDS = {
   ],
   severity: [
     // [value, audible, angle]  angle=null means not shown on compass dial
-    // 6 = straightest, 1 = tightest
-    ['6', null, 8],
-    ['5', null, 20],
-    ['4', null, 35],
-    ['3', null, 63],
-    ['2', null, 85],
+    // 1 = tightest, 6 = straightest
     ['1', null, 150],
+    ['2', null, 85],
+    ['3', null, 63],
+    ['4', null, 35],
+    ['5', null, 20],
+    ['6', null, 8],
     ['Hairpin', null, null],
     ['Square', null, null],
     ['Flat', null, null],

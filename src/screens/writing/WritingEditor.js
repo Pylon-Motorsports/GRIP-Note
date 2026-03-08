@@ -145,7 +145,11 @@ export default function WritingEditor({ route, navigation }) {
     ]);
     setCautionChips(cau);
     setDirChips(d);
-    setSevChips(s);
+    // Sort severity: numeric values ascending first, then non-numeric in DB order
+    const numeric = s.filter((c) => /^\d+$/.test(c.value));
+    const nonNumeric = s.filter((c) => !/^\d+$/.test(c.value));
+    numeric.sort((a, b) => Number(a.value) - Number(b.value));
+    setSevChips([...numeric, ...nonNumeric]);
     setDurChips(dur);
     setDecChips(dec);
     setJoinChips(j);
